@@ -14,38 +14,46 @@ st.set_page_config(
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
-    .stButton>button { width: 100%; border-radius: 8px; height: 3em; font-weight: bold; }
-    div[data-testid="stMetricValue"] { font-size: 2.2rem; }
-    .reportview-container .main .block-container { max-width: 1000px; padding-top: 2rem; }
+    .stButton>button { width: 100%; border-radius: 8px; height: 3em; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    div[data-testid="stMetricValue"] { font-size: 2rem; }
     h1 { color: #1e3a8a; }
     h2 { color: #1e40af; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
     h3 { color: #334155; margin-top: 1rem; }
-    .info-box { background-color: #e0f2fe; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid #0284c7; color: #0c4a6e; }
-    .warning-box { background-color: #fef3c7; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid #d97706; color: #78350f; }
-    .critical-box { background-color: #fee2e2; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid #dc2626; color: #7f1d1d; }
+    /* Estilos para las tarjetas de información del libro */
+    .stExpander { border: 1px solid #e2e8f0; border-radius: 8px; background: white; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- BARRA LATERAL ---
+# --- BARRA LATERAL (GESTIÓN DE SECRETOS) ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3063/3063176.png", width=50)
     st.title("SRNI.app")
-    st.caption("v2.1 | Rezoagli et al. 2025")
+    st.caption("v2.3 | Rezoagli et al. 2025")
     
     st.divider()
     
-    api_key = st.text_input("Google API Key", type="password", help="Introduce tu clave de Google Gemini")
+    # Lógica de seguridad para API Key
+    api_key = None
     
-    # Soporte para Secrets de Streamlit Cloud
-    if not api_key and 'GOOGLE_API_KEY' in st.secrets:
+    if 'GOOGLE_API_KEY' in st.secrets:
+        # CASO A: La clave está en el archivo seguro secrets.toml
         api_key = st.secrets['GOOGLE_API_KEY']
-        st.success("Licencia Activada ✅")
+        st.success("🔑 Licencia Activada (Secrets)")
+        st.caption("Clave cargada de forma segura.")
+    else:
+        # CASO B: Solicitud manual (Menos seguro, pero funcional)
+        api_key = st.text_input("Google API Key", type="password", help="Pega tu clave AIza... aquí")
+        if not api_key:
+            st.warning("⚠️ Se requiere API Key")
+            st.markdown("[Obtener Clave Gratis](https://aistudio.google.com/app/apikey)")
 
     if api_key:
         genai.configure(api_key=api_key)
     
     st.divider()
     st.info("Esta App distingue fenotipos (Hipoxémico vs Hipercápnico) para indicar la interfaz correcta.")
+    st.markdown("---")
+    st.caption("Diseñado para uso clínico a pie de cama.")
 
 # --- LÓGICA CLÍNICA (PROMPT) ---
 REZOAGLI_PROMPT = """
@@ -71,7 +79,7 @@ TAREA: Analiza el caso y recomienda estrategia ventilatoria.
 SALIDA EN MARKDOWN ESTRUCTURADO. SE BREVE Y DIRECTO.
 """
 
-# --- ESTRUCTURA DE PESTAÑAS ---
+# --- ESTRUCTURA DE PESTAÑAS (Tabbed Interface) ---
 tab_calc, tab_book = st.tabs(["🧮 Calculadora & IA", "📖 Libro de Bolsillo (Rezoagli '25)"])
 
 # ==========================================
@@ -80,7 +88,7 @@ tab_calc, tab_book = st.tabs(["🧮 Calculadora & IA", "📖 Libro de Bolsillo (
 with tab_calc:
     st.header("Motor de Decisión Clínica")
     
-    col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns([1, 1.1])
 
     with col1:
         st.subheader("1. Evaluación")
@@ -121,8 +129,8 @@ with tab_calc:
     with col2:
         st.subheader("2. Monitorización")
         
-        # Lógica de Color Corregida para evitar StreamlitAPIException
-        # Streamlit solo acepta "normal", "inverse", "off" para delta_color
+        # --- LÓGICA DE COLOR CORREGIDA ---
+        cc1, cc2 = st.columns(2)
         
         # Tarjeta ROX
         rox_delta_color = "off"
@@ -133,40 +141,42 @@ with tab_calc:
                 rox_delta_color = "normal" # Verde
                 rox_text = "Bajo Riesgo (>4.88)"
             elif rox < 3:
-                rox_delta_color = "inverse" # Rojo (Inverse porque bajo es malo)
+                rox_delta_color = "inverse" # Rojo
                 rox_text = "ALTO RIESGO (<3)"
             else:
-                rox_delta_color = "off" # Gris (Zona gris 3-4.88)
+                rox_delta_color = "off" # Gris
                 rox_text = "Zona Gris (3-4.88)"
 
-        st.metric(
-            label="Índice ROX",
-            value=f"{rox:.2f}",
-            delta=rox_text,
-            delta_color=rox_delta_color 
-        )
+        with cc1:
+            st.metric(
+                label="Índice ROX",
+                value=f"{rox:.2f}",
+                delta=rox_text,
+                delta_color=rox_delta_color 
+            )
         
         # Tarjeta PaFi
         pafi_delta_color = "off"
-        pafi_text = ""
+        pafi_text = "Monitorizar"
         
         if pafi > 0:
             if pafi < 150:
                 pafi_delta_color = "inverse" # Rojo
                 pafi_text = "Hipoxemia Severa"
-            elif pafi < 300:
-                pafi_delta_color = "off" # Gris
-                pafi_text = "Hipoxemia Moderada"
-            else:
+            elif pafi > 300:
                 pafi_delta_color = "normal" # Verde
                 pafi_text = "Normal"
+            else:
+                pafi_delta_color = "off" # Gris
+                pafi_text = "Hipoxemia Mod/Leve"
 
-        st.metric(
-            label="PaO2/FiO2",
-            value=f"{pafi:.0f}",
-            delta=pafi_text,
-            delta_color=pafi_delta_color
-        )
+        with cc2:
+            st.metric(
+                label="PaO2/FiO2",
+                value=f"{pafi:.0f}",
+                delta=pafi_text,
+                delta_color=pafi_delta_color
+            )
 
         st.divider()
 
@@ -174,7 +184,7 @@ with tab_calc:
         
         if analyze:
             if not api_key:
-                st.warning("⚠️ Introduce tu API Key en la barra lateral")
+                st.error("❌ FALTA API KEY: Configura .streamlit/secrets.toml o introdúcela en la barra lateral.")
             else:
                 with st.spinner("El Dr. Gemini está pensando..."):
                     try:
@@ -187,79 +197,71 @@ with tab_calc:
                         """
                         model = genai.GenerativeModel('gemini-1.5-pro-latest')
                         response = model.generate_content(REZOAGLI_PROMPT + contexto)
+                        st.markdown("### 🤖 Recomendación Clínica")
                         st.markdown(response.text)
                     except Exception as e:
-                        st.error(f"Error: {e}")
+                        st.error(f"Error de conexión con Gemini: {e}")
 
 # ==========================================
 # PESTAÑA 2: LIBRO DE BOLSILLO
 # ==========================================
 with tab_book:
-    st.markdown("## 📖 Guía de Bolsillo: Soporte Respiratorio")
-    st.caption("Resumen práctico basado en *Rezoagli et al. Critical Care (2025)*")
+    st.header("📖 Protocolo Rezoagli et al. (2025)")
+    st.markdown("Guía rápida para la selección y manejo de soporte respiratorio no invasivo.")
 
-    with st.expander("📌 CAPÍTULO 1: Algoritmo de Elección (Etiología)", expanded=True):
+    with st.expander("📌 CAPÍTULO 1: Selección de Interfaz (Etiología)", expanded=True):
         st.markdown("""
-        La decisión **NO** se basa solo en la hipoxemia, sino en la **CAUSA**:
+        **Regla de Oro:** No tratar solo la hipoxemia, tratar la fisiopatología.
 
-        | Etiología | 1ª Línea | 2ª Línea | Justificación |
-        | :--- | :--- | :--- | :--- |
-        | **Fallo Hipoxémico de Novo**<br>(Neumonía, SDRA) | **HFNT (Alto Flujo)** | CPAP / Helmet | HFNT es más confortable y reduce daño pulmonar (P-SILI) comparado con NIV estándar. |
-        | **Edema Agudo Pulmón**<br>(Cardiogénico) | **CPAP / NIV** | HFNT | La presión positiva (PEEP) reduce la postcarga del ventrículo izquierdo. |
-        | **EPOC / Asma**<br>(Hipercapnia) | **NIV (BiPAP)** | HFNT | Se necesita soporte inspiratorio (IPAP) para barrer CO2 y descargar músculos. |
-        | **Inmunocomprometido** | **HFNT** | NIV | HFNT reduce necesidad de intubación mejor que la oxigenoterapia estándar. |
+        | Escenario Clínico | Fisiopatología | 1ª Línea Recomendada |
+        | :--- | :--- | :--- |
+        | **Neumonía / SDRA** | Fallo Hipoxémico de Novo | **HFNT (Alto Flujo)** |
+        | **Edema Agudo Pulmón** | Fallo Cardiogénico (CPAP recluta) | **CPAP o NIV** |
+        | **EPOC / Asma** | Fallo Hipercápnico (Fatiga Muscular) | **NIV (BiPAP)** |
+        | **Inmunocomprometido** | Hipoxemia | **HFNT** (Menos intubación) |
         """)
-        st.info("💡 **Perla Clínica:** En neumonía/SDRA, evita la BiPAP con mascarilla facial si es posible, ya que aumenta volúmenes corrientes y riesgo de lesión autoinfligida (P-SILI).")
+        st.info("💡 **COVID-19:** Se puede intentar CPAP/Helmet para evitar intubación, pero vigilar P-SILI.")
 
-    with st.expander("🎛️ CAPÍTULO 2: Parámetros de Inicio (Setting)"):
-        st.markdown("""
-        ### 1. Cánula Nasal de Alto Flujo (HFNT)
-        *   **Flujo:** Iniciar agresivo a **40-60 L/min** para lavar espacio muerto.
-        *   **Temperatura:** 37ºC (bajar a 34ºC si disconfort).
-        *   **FiO2:** Titular para SpO2 92-96%.
-
-        ### 2. CPAP (Presión Positiva Continua)
-        *   **Interfaz:** Mascarilla Facial o Helmet.
-        *   **Presión:** Iniciar en **5-8 cmH2O**. En Helmet subir a 10-12 cmH2O.
-        *   **Objetivo:** Reclutamiento alveolar en EAP.
-
-        ### 3. VNI / BiPAP (Doble Nivel)
-        *   **Modo:** S/T (Spontaneous/Timed).
-        *   **EPAP (PEEP):** 5-8 cmH2O (Mantiene vía aérea abierta).
-        *   **IPAP (Presión Soporte):** Iniciar con PS de **8-10 cmH2O** sobre la EPAP.
-        *   *Ejemplo de orden:* "BiPAP 12/5" (IPAP 12, EPAP 5).
-        """)
-
-    with st.expander("🔍 CAPÍTULO 3: Monitorización y Fracaso"):
-        st.markdown("""
-        ### Índice ROX (Para HFNT)
-        $$ROX = (SpO_2 / FiO_2) / FR$$
-        *   Medir a las **2, 6 y 12 horas**.
-        *   ✅ **> 4.88:** Bajo riesgo de intubación. Continuar terapia.
-        *   ⚠️ **3.85 - 4.87:** Zona gris. Reevaluar en 1 hora.
-        *   ❌ **< 3.85:** Alto riesgo de fracaso. **CONSIDERAR INTUBACIÓN**.
-
-        ### Signos de P-SILI (Lesión Autoinfligida)
-        Si el paciente "pelea" con el aire, se daña el pulmón:
-        1.  Uso intenso de músculos accesorios (esternocleidomastoideo).
-        2.  Volúmenes tidal excesivos (> 9.5 ml/kg) en VNI.
-        3.  Grandes oscilaciones de presión esofágica (si se mide).
+    with st.expander("🎛️ CAPÍTULO 2: Parámetros de Arranque (Setting)"):
+        c_set1, c_set2 = st.columns(2)
+        with c_set1:
+            st.markdown("### 1. HFNT (Alto Flujo)")
+            st.markdown("""
+            *   **Flujo:** 40-60 L/min (Empezar alto).
+            *   **Temp:** 37ºC (34ºC si disconfort).
+            *   **FiO2:** Para SpO2 92-96%.
+            """)
+            st.markdown("### 2. CPAP")
+            st.markdown("""
+            *   **Máscara:** 5-8 cmH2O.
+            *   **Helmet:** 8-12 cmH2O (Requiere flujo alto).
+            """)
         
-        **Acción:** Si persiste alto drive respiratorio a pesar de optimizar HFNT/VNI -> **INTUBAR** para proteger el pulmón.
+        with c_set2:
+            st.markdown("### 3. VNI (BiPAP)")
+            st.markdown("""
+            *   **Modo:** S/T (Spont/Timed).
+            *   **EPAP (PEEP):** 5-8 cmH2O.
+            *   **IPAP (Presión Soporte):** Ajustar para VT 6-8 ml/kg.
+            *   *Inicio típico:* PS 8-10 sobre PEEP.
+            """)
+
+    with st.expander("⚠️ CAPÍTULO 3: Criterios de Fracaso y P-SILI"):
+        st.error("""
+        **¡ALERTA P-SILI (Lesión Pulmonar Autoinfligida)!**
+        Si el paciente mantiene un esfuerzo inspiratorio vigoroso (tiraje) a pesar del soporte, está dañando sus propios pulmones. **NO RETRASAR INTUBACIÓN.**
         """)
-
-    with st.expander("🚪 CAPÍTULO 4: Destete (Liberación)"):
         st.markdown("""
-        **¿Cuándo retirar el soporte?**
-        1.  Estabilidad clínica (FR < 25-30).
-        2.  SpO2 > 90-92% con FiO2 < 40-50%.
-        3.  Ausencia de tiraje intercostal.
-
-        **Estrategia:**
-        *   **HFNT:** Bajar primero FiO2 (<40%). Luego bajar flujo de 10 en 10 L/min.
-        *   **NIV:** Hacer pruebas de ventilación espontánea o intercalar con HFNT.
+        **Índice ROX (HFNT):**
+        *   Medir a las 2, 6 y 12 horas.
+        *   **ROX < 3.85:** Alto riesgo de fracaso -> Valorar IOT.
+        *   **ROX > 4.88:** Éxito probable.
+        
+        **Escala HACOR (VNI en EPOC):**
+        *   Evaluar FC, pH, Glasgow, PaO2/FiO2 y FR.
+        *   > 5 puntos a la hora = Fracaso probable.
         """)
 
 # --- FOOTER ---
 st.markdown("---")
-st.markdown("<div style='text-align: center; color: #64748b;'>SRNI.app © 2025 | Diseñado para iDoctor</div>", unsafe_allow_html=True)
+st.caption("SRNI.app - Herramienta de soporte a la decisión clínica. Verificar siempre con juicio médico.")
