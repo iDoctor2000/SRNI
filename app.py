@@ -35,17 +35,29 @@ with st.sidebar:
     # Lógica de seguridad para API Key
     api_key = None
     
+    # Prioridad 1: Secrets de Streamlit (.streamlit/secrets.toml)
     if 'GOOGLE_API_KEY' in st.secrets:
-        # CASO A: La clave está en el archivo seguro secrets.toml
         api_key = st.secrets['GOOGLE_API_KEY']
         st.success("🔑 Licencia Activada (Secrets)")
-        st.caption("Clave cargada de forma segura.")
-    else:
-        # CASO B: Solicitud manual (Menos seguro, pero funcional)
+    
+    # Prioridad 2: Variable de entorno del sistema (os.environ)
+    elif "GOOGLE_API_KEY" in os.environ:
+        api_key = os.environ["GOOGLE_API_KEY"]
+        st.success("🔑 Licencia Activada (Env)")
+        
+    # Prioridad 3: Variable genérica API_KEY
+    elif "API_KEY" in os.environ:
+        api_key = os.environ["API_KEY"]
+        st.success("🔑 Licencia Activada (Env)")
+
+    if not api_key:
+        # CASO MANUAL (Si fallan los anteriores)
         api_key = st.text_input("Google API Key", type="password", help="Pega tu clave AIza... aquí")
         if not api_key:
             st.warning("⚠️ Se requiere API Key")
             st.markdown("[Obtener Clave Gratis](https://aistudio.google.com/app/apikey)")
+    else:
+        st.caption("Clave cargada de forma segura.")
 
     if api_key:
         genai.configure(api_key=api_key)
