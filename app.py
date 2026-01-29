@@ -87,6 +87,7 @@ with col_logo:
 with col_title:
     st.markdown("<h2 style='margin:0; padding:0; color:#1e3a8a;'>SRNI.app</h2>", unsafe_allow_html=True)
     st.caption("Decisión Clínica en Soporte Respiratorio")
+    st.markdown("**By iDoctor**")
 
 st.markdown("---")
 
