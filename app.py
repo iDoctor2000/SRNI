@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import os
+from google.api_core import exceptions
 
 # ==========================================
 # 1. CONFIGURACIÓN ESTRATÉGICA
@@ -27,7 +28,7 @@ st.markdown("""
         font-size: 1.2rem;
         background-color: #2563eb;
         color: white;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
     }
     .stButton>button:hover { background-color: #1d4ed8; color: white; }
 
@@ -73,7 +74,7 @@ with st.sidebar:
         st.success("✅ Licencia Activada")
     
     st.divider()
-    st.info("SRNI.app v2.3\nBasado en Rezoagli et al. (2025)")
+    st.info("SRNI.app v2.4\nBasado en Rezoagli et al. (2025)")
 
 # ==========================================
 # 3. INTERFAZ DE USUARIO (MOBILE FIRST)
@@ -212,9 +213,10 @@ if st.button("🧠 ANALIZAR CASO AHORA"):
                 - Índices calculados: ROX {rox_index:.2f}, PaFi {pafi_ratio:.0f}
                 """
                 
-                # Llamada al modelo (Gemini 3 Pro para razonamiento complejo)
+                # Llamada al modelo 
+                # USAMOS 'gemini-3-flash-preview' PORQUE ES MÁS RÁPIDO Y EVITA ERRORES DE CUOTA (429)
                 model = genai.GenerativeModel(
-                    model_name='gemini-3-pro-preview',
+                    model_name='gemini-3-flash-preview',
                     system_instruction=SYSTEM_PROMPT
                 )
                 
@@ -224,11 +226,12 @@ if st.button("🧠 ANALIZAR CASO AHORA"):
                 st.success("Análisis Completado")
                 st.markdown(response.text)
                 
+            except exceptions.ResourceExhausted:
+                st.error("⏳ Límite de cuota alcanzado (Error 429).")
+                st.info("El sistema está saturado momentáneamente. Espera 1 minuto e inténtalo de nuevo, o utiliza una API Key con facturación habilitada.")
             except Exception as e:
                 st.error(f"Error de conexión: {str(e)}")
                 st.caption("Verifique su conexión a internet y que la API Key sea válida.")
 
 # Footer
 st.markdown("<br><br><div style='text-align: center; color: #cbd5e1; font-size: 0.8rem;'>SRNI.app - Herramienta de ayuda. No sustituye el juicio clínico.</div>", unsafe_allow_html=True)
-
-
