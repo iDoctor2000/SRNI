@@ -2,278 +2,233 @@ import streamlit as st
 import google.generativeai as genai
 import os
 
-# --- CONFIGURACIÓN DE PÁGINA ---
+# ==========================================
+# 1. CONFIGURACIÓN ESTRATÉGICA
+# ==========================================
 st.set_page_config(
-    page_title="SRNI.app - Guía Clínica",
+    page_title="SRNI.app - Rezoagli '25",
     page_icon="🫁",
-    layout="wide",
+    layout="centered", # 'Centered' se ve mejor en móviles verticales
     initial_sidebar_state="collapsed"
 )
 
-# --- ESTILOS CSS PERSONALIZADOS ---
+# CSS Hack para mejorar la experiencia táctil en móviles
 st.markdown("""
     <style>
-    .main { background-color: #f8fafc; }
-    .stButton>button { width: 100%; border-radius: 8px; height: 3em; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-    div[data-testid="stMetricValue"] { font-size: 2rem; }
-    h1 { color: #1e3a8a; }
-    h2 { color: #1e40af; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
-    h3 { color: #334155; margin-top: 1rem; }
-    /* Estilos para las tarjetas de información del libro */
-    .stExpander { border: 1px solid #e2e8f0; border-radius: 8px; background: white; }
+    /* Fondo más limpio */
+    .stApp { background-color: #f8fafc; }
+    
+    /* Botones más grandes para dedos */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        height: 3.5rem;
+        font-weight: 700;
+        font-size: 1.2rem;
+        background-color: #2563eb;
+        color: white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .stButton>button:hover { background-color: #1d4ed8; color: white; }
+
+    /* Métricas grandes */
+    div[data-testid="stMetricValue"] { font-size: 2.2rem; font-weight: 800; }
+    div[data-testid="stMetricLabel"] { font-size: 1rem; color: #64748b; }
+
+    /* Inputs más legibles */
+    label { font-size: 1rem !important; font-weight: 600 !important; color: #334155 !important; }
+    
+    /* Expander estilo tarjeta */
+    .streamlit-expanderContent { background-color: white; border-radius: 0 0 10px 10px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- BARRA LATERAL (GESTIÓN DE SECRETOS) ---
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3063/3063176.png", width=50)
-    st.title("SRNI.app")
-    st.caption("v2.3 | Rezoagli et al. 2025")
-    
-    st.divider()
-    
-    # Lógica de seguridad para API Key
-    api_key = None
-    
-    # Prioridad 1: Secrets de Streamlit (.streamlit/secrets.toml)
+# ==========================================
+# 2. GESTIÓN DE SEGURIDAD (API KEY)
+# ==========================================
+def get_api_key():
+    """Busca la API Key en Secrets, Entorno o Input manual."""
+    # 1. Streamlit Secrets (Nube)
     if 'GOOGLE_API_KEY' in st.secrets:
-        api_key = st.secrets['GOOGLE_API_KEY']
-        st.success("🔑 Licencia Activada (Secrets)")
+        return st.secrets['GOOGLE_API_KEY']
+    # 2. Variables de Entorno (Local/Docker)
+    if "GOOGLE_API_KEY" in os.environ:
+        return os.environ["GOOGLE_API_KEY"]
+    if "API_KEY" in os.environ:
+        return os.environ["API_KEY"]
+    return None
+
+# Sidebar Logica
+with st.sidebar:
+    st.header("Configuración")
+    api_key = get_api_key()
     
-    # Prioridad 2: Variable de entorno del sistema (os.environ)
-    elif "GOOGLE_API_KEY" in os.environ:
-        api_key = os.environ["GOOGLE_API_KEY"]
-        st.success("🔑 Licencia Activada (Env)")
-        
-    # Prioridad 3: Variable genérica API_KEY
-    elif "API_KEY" in os.environ:
-        api_key = os.environ["API_KEY"]
-        st.success("🔑 Licencia Activada (Env)")
-
     if not api_key:
-        # CASO MANUAL (Si fallan los anteriores)
-        api_key = st.text_input("Google API Key", type="password", help="Pega tu clave AIza... aquí")
-        if not api_key:
-            st.warning("⚠️ Se requiere API Key")
-            st.markdown("[Obtener Clave Gratis](https://aistudio.google.com/app/apikey)")
+        st.warning("⚠️ Sin Licencia Activa")
+        user_key = st.text_input("Introduce tu Google API Key:", type="password")
+        if user_key:
+            api_key = user_key
+            os.environ["GOOGLE_API_KEY"] = user_key # Set temporal
     else:
-        st.caption("Clave cargada de forma segura.")
-
-    if api_key:
-        genai.configure(api_key=api_key)
+        st.success("✅ Licencia Activada")
     
     st.divider()
-    st.info("Esta App distingue fenotipos (Hipoxémico vs Hipercápnico) para indicar la interfaz correcta.")
-    st.markdown("---")
-    st.caption("Diseñado para uso clínico a pie de cama.")
+    st.info("SRNI.app v2.3\nBasado en Rezoagli et al. (2025)")
 
-# --- LÓGICA CLÍNICA (PROMPT) ---
-REZOAGLI_PROMPT = """
-ACTÚA COMO UN CONSULTOR EXPERTO EN VENTILACIÓN NO INVASIVA.
-FUENTE: Rezoagli et al., "A clinical guide to non-invasive respiratory support in acute respiratory failure" (2025).
+# ==========================================
+# 3. INTERFAZ DE USUARIO (MOBILE FIRST)
+# ==========================================
 
-TAREA: Analiza el caso y recomienda estrategia ventilatoria.
+# Header
+col_logo, col_title = st.columns([1, 5])
+with col_logo:
+    st.write("🫁")
+with col_title:
+    st.markdown("<h2 style='margin:0; padding:0; color:#1e3a8a;'>SRNI.app</h2>", unsafe_allow_html=True)
+    st.caption("Decisión Clínica en Soporte Respiratorio")
 
-1. CLASIFICACIÓN DEL FALLO:
-   - ¿Es Hipoxémico de Novo (Neumonía/SDRA)? -> 1ª Elección: HFNT (Alto Flujo).
-   - ¿Es Cardiogénico (EAP)? -> 1ª Elección: CPAP/NIV.
-   - ¿Es Hipercápnico (EPOC/Asma)? -> 1ª Elección: NIV (BiPAP).
+st.markdown("---")
 
-2. CONFIGURACIÓN INICIAL (Prescripción precisa):
-   - HFNT: Flujo 40-60 L/min, T 34-37ºC.
-   - CPAP: 5-10 cmH2O.
-   - NIV (BiPAP): IPAP inicial para VT 6-8ml/kg, EPAP 5-8.
+# --- BLOQUE A: Evaluación Clínica ---
+st.markdown("### 1. Paciente")
+patologia = st.selectbox(
+    "Sospecha Clínica (Etiología)",
+    [
+        "Fallo Hipoxémico de Novo (Neumonía/SDRA)",
+        "Edema Agudo de Pulmón (Cardiogénico)",
+        "EPOC Agudizado / Hipercapnia",
+        "Inmunocomprometido",
+        "Traumatismo Torácico",
+        "Otro / No filiado"
+    ]
+)
 
-3. RIESGOS:
-   - Calcular y mencionar Riesgo de P-SILI si hay alto drive respiratorio.
-   - Definir criterio de INTUBACIÓN para este paciente específico.
+# Fila 1: Signos Vitales (Inputs numéricos grandes)
+c1, c2 = st.columns(2)
+with c1:
+    rr = st.number_input("Frec. Resp (rpm)", min_value=8, max_value=60, value=24, step=1)
+with c2:
+    spo2 = st.number_input("SpO2 (%)", min_value=50, max_value=100, value=90, step=1)
 
-SALIDA EN MARKDOWN ESTRUCTURADO. SE BREVE Y DIRECTO.
+# Fila 2: Sliders para ajustes rápidos
+st.markdown("---")
+fio2 = st.slider("FiO2 Suministrada (%)", 21, 100, 50, help="Desliza para ajustar la fracción inspirada de oxígeno")
+glasgow = st.slider("Escala de Glasgow", 3, 15, 15, help="Nivel de conciencia")
+
+# --- BLOQUE B: Gasometría (Opcional) ---
+with st.expander("🩸 Gasometría Arterial (Toca para abrir)", expanded=False):
+    g1, g2, g3 = st.columns(3)
+    ph = g1.number_input("pH", 6.80, 7.80, 7.35, step=0.01)
+    pco2 = g2.number_input("pCO2", 10, 150, 45)
+    po2 = g3.number_input("pO2", 30, 300, 80)
+
+# ==========================================
+# 4. MOTOR DE CÁLCULO
+# ==========================================
+try:
+    rox_index = (spo2 / (fio2/100)) / rr
+except ZeroDivisionError:
+    rox_index = 0.0
+
+try:
+    pafi_ratio = po2 / (fio2/100)
+except ZeroDivisionError:
+    pafi_ratio = 0.0
+
+# Visualización de Índices (Tarjetas)
+st.markdown("### 2. Monitorización")
+m1, m2 = st.columns(2)
+
+# Lógica de colores ROX
+rox_delta_color = "normal" # Verde por defecto
+rox_msg = "Estable"
+if rox_index < 2.85:
+    rox_delta_color = "inverse" # Rojo
+    rox_msg = "RIESGO ALTO (<2.85)"
+elif rox_index < 4.88:
+    rox_delta_color = "off" # Gris/Amarillo
+    rox_msg = "Riesgo Mod (<4.88)"
+
+m1.metric("Índice ROX", f"{rox_index:.2f}", delta=rox_msg, delta_color=rox_delta_color)
+
+# Lógica de colores PaFi
+pafi_color = "normal"
+pafi_msg = "Leve/Normal"
+if pafi_ratio < 150:
+    pafi_color = "inverse"
+    pafi_msg = "Hipoxemia Severa"
+elif pafi_ratio < 300:
+    pafi_color = "off"
+    pafi_msg = "Moderada"
+
+m2.metric("PaO2/FiO2", f"{pafi_ratio:.0f}", delta=pafi_msg, delta_color=pafi_color)
+
+# ==========================================
+# 5. INTELIGENCIA ARTIFICIAL
+# ==========================================
+st.markdown("---")
+
+# Prompt del Sistema (Instrucciones estrictas)
+SYSTEM_PROMPT = """
+ERES UN EXPERTO CLÍNICO EN SOPORTE RESPIRATORIO NO INVASIVO.
+BASE BIBLIOGRÁFICA: Rezoagli et al. (2025) "A clinical guide to non-invasive respiratory support".
+
+TU OBJETIVO: Dar una recomendación clara, breve y segura para un médico a pie de cama.
+
+REGLAS DE DECISIÓN:
+1. Fallo Hipoxémico de Novo (Neumonía/SDRA) -> 1ª Elección: HFNT (Alto Flujo).
+2. Fallo Cardiogénico (EAP) -> 1ª Elección: CPAP o NIV.
+3. Fallo Hipercápnico (EPOC/Asma) -> 1ª Elección: NIV (BiPAP).
+
+FORMATO DE RESPUESTA:
+### 🚑 Recomendación
+(Indica la Interfaz exacta y por qué).
+
+### ⚙️ Ajustes Iniciales
+(Lista con viñetas los valores exactos de Flujo, Presión, FiO2, etc).
+
+### ⚠️ Alertas
+(Menciona riesgo de P-SILI y criterios de intubación si ROX < 4.88).
+
+SE MUY CONCISO. NO TE ENROLLES.
 """
 
-# --- ESTRUCTURA DE PESTAÑAS (Tabbed Interface) ---
-tab_calc, tab_book = st.tabs(["🧮 Calculadora & IA", "📖 Libro de Bolsillo (Rezoagli '25)"])
+if st.button("🧠 ANALIZAR CASO AHORA"):
+    if not api_key:
+        st.error("⛔ ERROR: Falta la API Key. Configúrala en la barra lateral.")
+    else:
+        with st.spinner("Consultando guías clínicas..."):
+            try:
+                # Configurar cliente
+                genai.configure(api_key=api_key)
+                
+                # Construir el caso clínico
+                user_case = f"""
+                CASO CLÍNICO:
+                - Sospecha: {patologia}
+                - Constantes: FR {rr}, SpO2 {spo2}%, FiO2 {fio2}%
+                - Neuro: Glasgow {glasgow}
+                - Gases: pH {ph}, pCO2 {pco2}, PaO2 {po2}
+                - Índices calculados: ROX {rox_index:.2f}, PaFi {pafi_ratio:.0f}
+                """
+                
+                # Llamada al modelo (Gemini 3 Pro para razonamiento complejo)
+                model = genai.GenerativeModel(
+                    model_name='gemini-3-pro-preview',
+                    system_instruction=SYSTEM_PROMPT
+                )
+                
+                response = model.generate_content(user_case)
+                
+                # Mostrar resultado
+                st.success("Análisis Completado")
+                st.markdown(response.text)
+                
+            except Exception as e:
+                st.error(f"Error de conexión: {str(e)}")
+                st.caption("Verifique su conexión a internet y que la API Key sea válida.")
 
-# ==========================================
-# PESTAÑA 1: CALCULADORA E IA
-# ==========================================
-with tab_calc:
-    st.header("Motor de Decisión Clínica")
-    
-    col1, col2 = st.columns([1, 1.1])
+# Footer
+st.markdown("<br><br><div style='text-align: center; color: #cbd5e1; font-size: 0.8rem;'>SRNI.app - Herramienta de ayuda. No sustituye el juicio clínico.</div>", unsafe_allow_html=True)
 
-    with col1:
-        st.subheader("1. Evaluación")
-        patologia = st.selectbox(
-            "Sospecha Clínica (Fenotipo)",
-            [
-                "Fallo Hipoxémico de Novo (Neumonía/SDRA)",
-                "Edema Agudo de Pulmón (Cardiogénico)",
-                "EPOC Agudizado / Hipercapnia",
-                "Inmunocomprometido",
-                "Traumatismo Torácico"
-            ]
-        )
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            rr = st.number_input("Frecuencia (rpm)", 10, 60, 24)
-            spo2 = st.number_input("SpO2 (%)", 50, 100, 90)
-        with c2:
-            fio2 = st.number_input("FiO2 (%)", 21, 100, 50)
-            glasgow = st.number_input("Glasgow", 3, 15, 15)
 
-        with st.expander("➕ Gasometría (Opcional)"):
-            gc1, gc2, gc3 = st.columns(3)
-            ph = gc1.number_input("pH", 6.8, 7.8, 7.35, step=0.01)
-            pco2 = gc2.number_input("pCO2", 10, 150, 45)
-            po2 = gc3.number_input("pO2", 30, 300, 80)
-
-        # Cálculos seguros en Python
-        try:
-            rox = (spo2 / (fio2/100)) / rr
-        except: rox = 0
-        
-        try:
-            pafi = po2 / (fio2/100)
-        except: pafi = 0
-
-    with col2:
-        st.subheader("2. Monitorización")
-        
-        # --- LÓGICA DE COLOR CORREGIDA ---
-        cc1, cc2 = st.columns(2)
-        
-        # Tarjeta ROX
-        rox_delta_color = "off"
-        rox_text = "Monitorizar"
-        
-        if rox > 0:
-            if rox >= 4.88:
-                rox_delta_color = "normal" # Verde
-                rox_text = "Bajo Riesgo (>4.88)"
-            elif rox < 3:
-                rox_delta_color = "inverse" # Rojo
-                rox_text = "ALTO RIESGO (<3)"
-            else:
-                rox_delta_color = "off" # Gris
-                rox_text = "Zona Gris (3-4.88)"
-
-        with cc1:
-            st.metric(
-                label="Índice ROX",
-                value=f"{rox:.2f}",
-                delta=rox_text,
-                delta_color=rox_delta_color 
-            )
-        
-        # Tarjeta PaFi
-        pafi_delta_color = "off"
-        pafi_text = "Monitorizar"
-        
-        if pafi > 0:
-            if pafi < 150:
-                pafi_delta_color = "inverse" # Rojo
-                pafi_text = "Hipoxemia Severa"
-            elif pafi > 300:
-                pafi_delta_color = "normal" # Verde
-                pafi_text = "Normal"
-            else:
-                pafi_delta_color = "off" # Gris
-                pafi_text = "Hipoxemia Mod/Leve"
-
-        with cc2:
-            st.metric(
-                label="PaO2/FiO2",
-                value=f"{pafi:.0f}",
-                delta=pafi_text,
-                delta_color=pafi_delta_color
-            )
-
-        st.divider()
-
-        analyze = st.button("🧠 ANALIZAR CASO CON IA", type="primary")
-        
-        if analyze:
-            if not api_key:
-                st.error("❌ FALTA API KEY: Configura .streamlit/secrets.toml o introdúcela en la barra lateral.")
-            else:
-                with st.spinner("El Dr. Gemini está pensando..."):
-                    try:
-                        contexto = f"""
-                        PACIENTE: {patologia}
-                        MECÁNICA: FR {rr}, SpO2 {spo2}, FiO2 {fio2}
-                        GASES: pH {ph}, pCO2 {pco2}, pO2 {po2}
-                        NEURO: GCS {glasgow}
-                        CALCULADOS: ROX {rox:.2f}, PaFi {pafi:.0f}
-                        """
-                        model = genai.GenerativeModel('gemini-1.5-pro-latest')
-                        response = model.generate_content(REZOAGLI_PROMPT + contexto)
-                        st.markdown("### 🤖 Recomendación Clínica")
-                        st.markdown(response.text)
-                    except Exception as e:
-                        st.error(f"Error de conexión con Gemini: {e}")
-
-# ==========================================
-# PESTAÑA 2: LIBRO DE BOLSILLO
-# ==========================================
-with tab_book:
-    st.header("📖 Protocolo Rezoagli et al. (2025)")
-    st.markdown("Guía rápida para la selección y manejo de soporte respiratorio no invasivo.")
-
-    with st.expander("📌 CAPÍTULO 1: Selección de Interfaz (Etiología)", expanded=True):
-        st.markdown("""
-        **Regla de Oro:** No tratar solo la hipoxemia, tratar la fisiopatología.
-
-        | Escenario Clínico | Fisiopatología | 1ª Línea Recomendada |
-        | :--- | :--- | :--- |
-        | **Neumonía / SDRA** | Fallo Hipoxémico de Novo | **HFNT (Alto Flujo)** |
-        | **Edema Agudo Pulmón** | Fallo Cardiogénico (CPAP recluta) | **CPAP o NIV** |
-        | **EPOC / Asma** | Fallo Hipercápnico (Fatiga Muscular) | **NIV (BiPAP)** |
-        | **Inmunocomprometido** | Hipoxemia | **HFNT** (Menos intubación) |
-        """)
-        st.info("💡 **COVID-19:** Se puede intentar CPAP/Helmet para evitar intubación, pero vigilar P-SILI.")
-
-    with st.expander("🎛️ CAPÍTULO 2: Parámetros de Arranque (Setting)"):
-        c_set1, c_set2 = st.columns(2)
-        with c_set1:
-            st.markdown("### 1. HFNT (Alto Flujo)")
-            st.markdown("""
-            *   **Flujo:** 40-60 L/min (Empezar alto).
-            *   **Temp:** 37ºC (34ºC si disconfort).
-            *   **FiO2:** Para SpO2 92-96%.
-            """)
-            st.markdown("### 2. CPAP")
-            st.markdown("""
-            *   **Máscara:** 5-8 cmH2O.
-            *   **Helmet:** 8-12 cmH2O (Requiere flujo alto).
-            """)
-        
-        with c_set2:
-            st.markdown("### 3. VNI (BiPAP)")
-            st.markdown("""
-            *   **Modo:** S/T (Spont/Timed).
-            *   **EPAP (PEEP):** 5-8 cmH2O.
-            *   **IPAP (Presión Soporte):** Ajustar para VT 6-8 ml/kg.
-            *   *Inicio típico:* PS 8-10 sobre PEEP.
-            """)
-
-    with st.expander("⚠️ CAPÍTULO 3: Criterios de Fracaso y P-SILI"):
-        st.error("""
-        **¡ALERTA P-SILI (Lesión Pulmonar Autoinfligida)!**
-        Si el paciente mantiene un esfuerzo inspiratorio vigoroso (tiraje) a pesar del soporte, está dañando sus propios pulmones. **NO RETRASAR INTUBACIÓN.**
-        """)
-        st.markdown("""
-        **Índice ROX (HFNT):**
-        *   Medir a las 2, 6 y 12 horas.
-        *   **ROX < 3.85:** Alto riesgo de fracaso -> Valorar IOT.
-        *   **ROX > 4.88:** Éxito probable.
-        
-        **Escala HACOR (VNI en EPOC):**
-        *   Evaluar FC, pH, Glasgow, PaO2/FiO2 y FR.
-        *   > 5 puntos a la hora = Fracaso probable.
-        """)
-
-# --- FOOTER ---
-st.markdown("---")
-st.caption("SRNI.app - Herramienta de soporte a la decisión clínica. Verificar siempre con juicio médico.")
