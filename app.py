@@ -184,7 +184,7 @@ def render_gauge(value, title, min_val, max_val, thresholds, labels, inverse=Fal
     c_warn = "#94a3b8"   # Gris/Neutro
     c_safe = "#22c55e"   # Verde
     
-    if inverse: # Para casos donde menor es mejor (no aplica a ROX/PAFI usualmente, pero por si acaso)
+    if inverse: # Para casos donde menor es mejor
         col1, col2, col3 = c_safe, c_warn, c_danger
     else: # ROX y PAFI: Bajo es malo (Rojo), Medio es alerta (Gris), Alto es bueno (Verde)
         col1, col2, col3 = c_danger, c_warn, c_safe
@@ -192,31 +192,27 @@ def render_gauge(value, title, min_val, max_val, thresholds, labels, inverse=Fal
     # Posición del marcador
     marker_left = pct_value
     
+    # IMPORTANTE: No indentar el HTML dentro de la f-string para evitar que Streamlit
+    # lo interprete como bloque de código Markdown.
     html = f"""
-    <div style="margin-bottom: 15px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; font-size:0.9rem; color:#334155;">
-            <span>{title}: <span style="font-size:1.1rem; color:#1e3a8a;">{value:.2f}</span></span>
-        </div>
-        
-        <!-- Barra contenedora -->
-        <div style="position: relative; height: 24px; background: #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="width: {width_seg1}%; background: {col1};" title="{labels[0]}"></div>
-            <div style="width: {width_seg2}%; background: {col2};" title="{labels[1]}"></div>
-            <div style="width: {width_seg3}%; background: {col3};" title="{labels[2]}"></div>
-            
-            <!-- Marcador -->
-            <div style="position: absolute; left: calc({marker_left}% - 2px); top: 0; bottom: 0; width: 4px; background: #000; border: 1px solid white; z-index: 10;"></div>
-            <div style="position: absolute; left: calc({marker_left}% - 12px); top: -2px; font-size: 18px; line-height:1; color: black; z-index: 11; text-shadow: 0 0 2px white;">⬇</div>
-        </div>
-        
-        <!-- Leyenda simple inferior -->
-        <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#64748b; margin-top:2px;">
-            <span style="width:{width_seg1}%; text-align:center;">{labels[0]}</span>
-            <span style="width:{width_seg2}%; text-align:center;">{labels[1]}</span>
-            <span style="width:{width_seg3}%; text-align:center;">{labels[2]}</span>
-        </div>
+<div style="margin-bottom: 15px;">
+    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; font-size:0.9rem; color:#334155;">
+        <span>{title}: <span style="font-size:1.1rem; color:#1e3a8a;">{value:.2f}</span></span>
     </div>
-    """
+    <div style="position: relative; height: 24px; background: #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+        <div style="width: {width_seg1}%; background: {col1};" title="{labels[0]}"></div>
+        <div style="width: {width_seg2}%; background: {col2};" title="{labels[1]}"></div>
+        <div style="width: {width_seg3}%; background: {col3};" title="{labels[2]}"></div>
+        <div style="position: absolute; left: calc({marker_left}% - 2px); top: 0; bottom: 0; width: 4px; background: #000; border: 1px solid white; z-index: 10;"></div>
+        <div style="position: absolute; left: calc({marker_left}% - 12px); top: -2px; font-size: 18px; line-height:1; color: black; z-index: 11; text-shadow: 0 0 2px white;">⬇</div>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#64748b; margin-top:2px;">
+        <span style="width:{width_seg1}%; text-align:center;">{labels[0]}</span>
+        <span style="width:{width_seg2}%; text-align:center;">{labels[1]}</span>
+        <span style="width:{width_seg3}%; text-align:center;">{labels[2]}</span>
+    </div>
+</div>
+"""
     return html
 
 # ==========================================
