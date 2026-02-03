@@ -1,6 +1,8 @@
 import streamlit as st
 import google.generativeai as genai
 import os
+import time
+import streamlit.components.v1 as components
 from google.api_core import exceptions
 
 # ==========================================
@@ -13,22 +15,34 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS AVANZADO: COMPACTACIÓN Y ESTILOS DE INFO
+# ==========================================
+# 2. CSS AVANZADO Y ESTILOS
+# ==========================================
 st.markdown("""
     <style>
-    /* Ajuste del contenedor principal para evitar corte superior */
+    /* Ajuste del contenedor principal */
     .block-container {
         padding-top: 3rem !important;
-        padding-bottom: 2rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
+        padding-bottom: 3rem !important;
     }
     
+    /* Espaciado entre elementos */
     div[data-testid="stVerticalBlock"] > div {
-        margin-bottom: -0.5rem !important;
-        gap: 0.5rem !important;
+        gap: 0.8rem !important;
     }
     
+    /* ESTILO DE LA CAJA PRINCIPAL (CONTENEDOR) */
+    /* Apuntamos al contenedor con borde */
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        background-color: #fff7ed !important; /* Naranja muy pálido */
+        border: 1px solid #fed7aa !important; /* Borde naranja suave */
+        border-radius: 12px !important;
+        padding: 20px !important;
+        margin-top: 25px !important; /* Separación del título */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Botones */
     .stButton>button {
         width: 100%;
         border-radius: 8px;
@@ -36,17 +50,19 @@ st.markdown("""
         font-weight: 700;
         background-color: #2563eb;
         color: white;
-        margin-top: 15px;
+        margin-top: 10px;
+        border: none;
+    }
+    .stButton>button:hover {
+        background-color: #1d4ed8;
     }
     
-    div[data-testid="stMetricValue"] { font-size: 1.6rem !important; }
-    div[data-testid="stMetricLabel"] { font-size: 0.8rem !important; }
-    
+    /* Inputs numéricos */
     .stNumberInput input { height: 2rem; text-align: center !important; }
     
     /* Panel de Referencia Rápida */
     .ref-box {
-        background-color: #f8fafc;
+        background-color: #ffffff;
         border: 1px solid #e2e8f0;
         border-left: 5px solid #2563eb;
         padding: 15px;
@@ -70,12 +86,12 @@ st.markdown("""
         margin-top: 5px;
     }
     .param-item {
-        background: white;
+        background: #f8fafc;
         padding: 6px 10px;
         border-radius: 6px;
         border: 1px solid #f1f5f9;
         font-size: 0.8rem;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        text-align: center;
     }
     .param-label {
         font-weight: 700;
@@ -87,7 +103,7 @@ st.markdown("""
     .param-value {
         color: #1e293b;
         font-weight: 600;
-        font-size: 0.85rem;
+        font-size: 0.9rem;
     }
     .safety-alert {
         margin-top: 12px;
@@ -97,7 +113,7 @@ st.markdown("""
         color: #b91c1c;
     }
     
-    /* ESTILOS HEADER PERSONALIZADOS */
+    /* Header Styles */
     .header-title {
         color: #1e3a8a;
         font-weight: 800;
@@ -106,11 +122,10 @@ st.markdown("""
         padding: 0 !important;
         line-height: 1.2 !important;
         display: flex;
-        align-items: center; /* Alineación vertical centrada */
+        align-items: center;
         height: 100%;
         padding-top: 10px !important;
     }
-    
     .header-subtitle-inline {
         font-family: "Source Sans Pro", sans-serif;
         font-style: italic;
@@ -118,13 +133,94 @@ st.markdown("""
         color: #64748b;
         font-weight: 400;
         margin-left: 10px;
-        padding-top: 8px; /* Pequeño ajuste visual para alinear con la base del texto grande */
+        padding-top: 8px;
+    }
+    
+    /* Estilos para el Cronómetro */
+    .timer-container {
+        font-family: 'Courier New', monospace;
+        background: #1e293b;
+        color: #22c55e;
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        border: 2px solid #475569;
+        margin-bottom: 10px;
+        letter-spacing: 2px;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. LÓGICA DE REFERENCIA CLÍNICA (ESTRUCTURADA)
+# 3. FUNCIONES AUXILIARES (GRÁFICOS)
+# ==========================================
+
+def render_gauge(value, title, min_val, max_val, thresholds, labels, inverse=False):
+    """
+    Genera una barra de progreso visual HTML/CSS (Gauge lineal)
+    thresholds: [limite_bajo, limite_alto]
+    """
+    # Normalizar valor para el ancho (0-100%)
+    range_span = max_val - min_val
+    pct_value = ((value - min_val) / range_span) * 100
+    pct_value = max(0, min(100, pct_value)) # Clampar entre 0 y 100
+    
+    # Calcular anchos de segmentos
+    # Asumimos estructura: Rojo | Gris | Verde (o invertido)
+    t1 = thresholds[0]
+    t2 = thresholds[1]
+    
+    pct_t1 = ((t1 - min_val) / range_span) * 100
+    pct_t2 = ((t2 - min_val) / range_span) * 100
+    
+    width_seg1 = pct_t1
+    width_seg2 = pct_t2 - pct_t1
+    width_seg3 = 100 - pct_t2
+    
+    # Colores
+    c_danger = "#ef4444" # Rojo
+    c_warn = "#94a3b8"   # Gris/Neutro
+    c_safe = "#22c55e"   # Verde
+    
+    if inverse: # Para casos donde menor es mejor (no aplica a ROX/PAFI usualmente, pero por si acaso)
+        col1, col2, col3 = c_safe, c_warn, c_danger
+    else: # ROX y PAFI: Bajo es malo (Rojo), Medio es alerta (Gris), Alto es bueno (Verde)
+        col1, col2, col3 = c_danger, c_warn, c_safe
+
+    # Posición del marcador
+    marker_left = pct_value
+    
+    html = f"""
+    <div style="margin-bottom: 15px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; font-size:0.9rem; color:#334155;">
+            <span>{title}: <span style="font-size:1.1rem; color:#1e3a8a;">{value:.2f}</span></span>
+        </div>
+        
+        <!-- Barra contenedora -->
+        <div style="position: relative; height: 24px; background: #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="width: {width_seg1}%; background: {col1};" title="{labels[0]}"></div>
+            <div style="width: {width_seg2}%; background: {col2};" title="{labels[1]}"></div>
+            <div style="width: {width_seg3}%; background: {col3};" title="{labels[2]}"></div>
+            
+            <!-- Marcador -->
+            <div style="position: absolute; left: calc({marker_left}% - 2px); top: 0; bottom: 0; width: 4px; background: #000; border: 1px solid white; z-index: 10;"></div>
+            <div style="position: absolute; left: calc({marker_left}% - 12px); top: -2px; font-size: 18px; line-height:1; color: black; z-index: 11; text-shadow: 0 0 2px white;">⬇</div>
+        </div>
+        
+        <!-- Leyenda simple inferior -->
+        <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#64748b; margin-top:2px;">
+            <span style="width:{width_seg1}%; text-align:center;">{labels[0]}</span>
+            <span style="width:{width_seg2}%; text-align:center;">{labels[1]}</span>
+            <span style="width:{width_seg3}%; text-align:center;">{labels[2]}</span>
+        </div>
+    </div>
+    """
+    return html
+
+# ==========================================
+# 4. LÓGICA DE REFERENCIA
 # ==========================================
 REFERENCIAS = {
     "Fallo Hipoxémico de Novo": {
@@ -183,9 +279,6 @@ REFERENCIAS = {
     }
 }
 
-# ==========================================
-# 3. GESTIÓN DE API KEY
-# ==========================================
 def get_api_key():
     if 'GOOGLE_API_KEY' in st.secrets: return st.secrets['GOOGLE_API_KEY']
     if "GOOGLE_API_KEY" in os.environ: return os.environ["GOOGLE_API_KEY"]
@@ -195,28 +288,84 @@ def get_api_key():
 api_key = get_api_key()
 
 # ==========================================
-# 4. INTERFAZ (HEADER)
+# 5. HEADER
 # ==========================================
-
-# Ajustamos las columnas para reducir el tamaño del logo (ratio 1.2 a 8.8)
 c_logo, c_text = st.columns([1.2, 8.8])
-
 with c_logo:
     try:
-        # Logo responsive
         st.image("IMG/SRNI.png", use_container_width=True)
     except Exception:
         st.error("Logo?")
-
 with c_text:
-    # Título alineado con el subtítulo "By iDoctor" en la misma línea
     st.markdown('<h1 class="header-title">Asistente SRNI <span class="header-subtitle-inline">By iDoctor</span></h1>', unsafe_allow_html=True)
 
 # ==========================================
-# 5. PANEL CENTRAL
+# 6. PANEL CENTRAL
 # ==========================================
-
 with st.container(border=True):
+    # --- CRONÓMETRO ---
+    st.markdown("### ⏱️ Tiempo de Terapia")
+    
+    # Control del estado del cronómetro en Python
+    if 'timer_active' not in st.session_state:
+        st.session_state.timer_active = False
+    if 'start_time_ts' not in st.session_state:
+        st.session_state.start_time_ts = 0.0
+
+    col_timer_disp, col_timer_btn = st.columns([3, 1])
+
+    with col_timer_btn:
+        if st.button("⏯️ Iniciar / Pausar", key="toggle_timer"):
+            if not st.session_state.timer_active:
+                st.session_state.timer_active = True
+                # Si es 0, empezamos de nuevo, si no, continuamos (lógica simple para este ejemplo)
+                if st.session_state.start_time_ts == 0:
+                    st.session_state.start_time_ts = time.time()
+                else:
+                    # Ajuste para pausar/reanudar requeriría más lógica, 
+                    # para simplificar "Iniciar" resetea al momento actual si estaba parado
+                    st.session_state.start_time_ts = time.time()
+            else:
+                st.session_state.timer_active = False
+                st.session_state.start_time_ts = 0 # Reset al parar
+
+    with col_timer_disp:
+        # Javascript para el contador en cliente (sin re-run de Streamlit)
+        if st.session_state.timer_active:
+            # Pasamos el timestamp de inicio a JS
+            start_ts_js = st.session_state.start_time_ts * 1000 
+            components.html(
+                f"""
+                <div id="clock" style="font-family: 'Courier New', monospace; background: #1e293b; color: #22c55e; padding: 10px; border-radius: 8px; text-align: center; font-size: 24px; font-weight: bold; border: 2px solid #475569; letter-spacing: 2px;">
+                    00:00:00
+                </div>
+                <script>
+                    var start = {start_ts_js};
+                    function update() {{
+                        var now = new Date().getTime();
+                        var distance = now - start;
+                        
+                        var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                        var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                        
+                        hours = hours < 10 ? "0" + hours : hours;
+                        minutes = minutes < 10 ? "0" + minutes : minutes;
+                        seconds = seconds < 10 ? "0" + seconds : seconds;
+                        
+                        document.getElementById("clock").innerHTML = hours + ":" + minutes + ":" + seconds;
+                    }}
+                    setInterval(update, 1000);
+                    update();
+                </script>
+                """,
+                height=60
+            )
+        else:
+             st.markdown('<div class="timer-container">00:00:00</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
     patologia = st.selectbox(
         "Sospecha Clínica",
         list(REFERENCIAS.keys()),
@@ -225,46 +374,26 @@ with st.container(border=True):
         label_visibility="collapsed"
     )
 
-    # --- CUADRO DE RESUMEN DINÁMICO ---
-    # Solo mostramos el panel de referencia si se ha seleccionado una patología
     if patologia:
         ref = REFERENCIAS[patologia]
         st.markdown(f"""
         <div class="ref-box">
-            <div class="ref-title">📋 Configuración Inicial: {ref['terapia']}</div>
+            <div class="ref-title">📋 Configuración: {ref['terapia']}</div>
             <div class="param-grid">
-                <div class="param-item">
-                    <span class="param-label">IPAP</span>
-                    <span class="param-value">{ref['ipap']}</span>
-                </div>
-                <div class="param-item">
-                    <span class="param-label">EPAP / PEEP</span>
-                    <span class="param-value">{ref['epap']}</span>
-                </div>
-                <div class="param-item">
-                    <span class="param-label">P. Soporte</span>
-                    <span class="param-value">{ref['ps']}</span>
-                </div>
-                <div class="param-item">
-                    <span class="param-label">FiO2</span>
-                    <span class="param-value">{ref['fio2']}</span>
-                </div>
-                <div class="param-item">
-                    <span class="param-label">Vol. Corriente</span>
-                    <span class="param-value">{ref['vt']}</span>
-                </div>
+                <div class="param-item"><span class="param-label">IPAP</span><br><span class="param-value">{ref['ipap']}</span></div>
+                <div class="param-item"><span class="param-label">EPAP</span><br><span class="param-value">{ref['epap']}</span></div>
+                <div class="param-item"><span class="param-label">PS</span><br><span class="param-value">{ref['ps']}</span></div>
+                <div class="param-item"><span class="param-label">FiO2</span><br><span class="param-value">{ref['fio2']}</span></div>
+                <div class="param-item"><span class="param-label">VT</span><br><span class="param-value">{ref['vt']}</span></div>
             </div>
-            <div class="safety-alert">
-                🚨 <b>Aspectos de Seguridad:</b> {ref['seguridad']}
-            </div>
+            <div class="safety-alert">🚨 {ref['seguridad']}</div>
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.info("👆 Seleccione una enfermedad representativa para ver la referencia clínica.")
+        st.info("👆 Seleccione enfermedad para ver referencia.")
 
-    st.markdown("---") 
+    st.markdown("#### Monitorización") 
 
-    # GRID DE 3 COLUMNAS PARA VITALES
     c1, c2, c3 = st.columns(3)
     with c1:
         st.caption("Frec. Resp") 
@@ -276,10 +405,8 @@ with st.container(border=True):
         st.caption("Glasgow")
         glasgow = st.number_input("GCS", 3, 15, 15, label_visibility="collapsed")
 
-    # FiO2 Slider
-    st.write("") 
     c_fio_label, c_fio_val = st.columns([3,1])
-    with c_fio_label: st.caption("FiO2 Programada Actual")
+    with c_fio_label: st.caption("FiO2 Programada (%)")
     with c_fio_val: st.markdown(f"**{st.session_state.get('fio2_val', 50)}%**")
     fio2 = st.slider("FiO2", 21, 100, 50, key="fio2_val", label_visibility="collapsed")
 
@@ -290,46 +417,59 @@ with st.container(border=True):
         po2 = g3.number_input("pO2", 30, 300, 80)
 
 # ==========================================
-# 6. CÁLCULOS Y RESULTADOS
+# 7. RESULTADOS GRÁFICOS
 # ==========================================
+# Cálculos
 rox_index = (spo2 / (fio2/100)) / rr if rr > 0 else 0
 pafi_ratio = po2 / (fio2/100) if fio2 > 0 else 0
 
-st.caption("Monitorización en tiempo real")
-r1, r2 = st.columns(2)
+st.write("")
+st.markdown("### 📊 Índices de Seguridad")
 
-rox_color = "normal"
-if rox_index < 2.85: rox_color = "inverse"
-elif rox_index < 4.88: rox_color = "off"
-r1.metric("ROX Index", f"{rox_index:.2f}", delta_color=rox_color)
+# Renderizar Gráfico ROX
+# Escala visual: 0 a 10 (aprox, para que se vea bien). Cortes: 2.85 y 4.88
+html_rox = render_gauge(
+    value=rox_index,
+    title="Índice ROX",
+    min_val=0,
+    max_val=12, # Un poco más de 10 para margen
+    thresholds=[2.85, 4.88],
+    labels=["Alto Riesgo (<2.85)", "Vigilancia (2.85-4.88)", "Bajo Riesgo (>4.88)"],
+    inverse=False
+)
+st.markdown(html_rox, unsafe_allow_html=True)
 
-pafi_color = "normal"
-if pafi_ratio < 150: pafi_color = "inverse"
-elif pafi_ratio < 300: pafi_color = "off"
-r2.metric("PaFi Ratio", f"{pafi_ratio:.0f}", delta_color=pafi_color)
+# Renderizar Gráfico PaFi
+# Escala visual: 0 a 500. Cortes: 150 y 300 (SDRA Mod-Sev vs Leve vs No)
+html_pafi = render_gauge(
+    value=pafi_ratio,
+    title="PaFi Ratio",
+    min_val=0,
+    max_val=500,
+    thresholds=[150, 300],
+    labels=["Severo (<150)", "Leve/Mod (150-300)", "Normal (>300)"],
+    inverse=False
+)
+st.markdown(html_pafi, unsafe_allow_html=True)
 
 # ==========================================
-# 7. IA / BOTÓN DE ACCIÓN
+# 8. IA BOTÓN
 # ==========================================
+st.write("")
 if st.button("🧠 OBTENER RECOMENDACIÓN IA PERSONALIZADA"):
     if not api_key:
-        st.error("⚠️ API Key no detectada. Verifique configuración.")
+        st.error("⚠️ API Key no detectada.")
     elif not patologia:
-        st.warning("⚠️ Por favor, seleccione una Enfermedad Representativa antes de consultar a la IA.")
+        st.warning("⚠️ Seleccione una patología primero.")
     else:
-        with st.spinner("Gemini analizando el contexto clínico..."):
+        with st.spinner("Analizando..."):
             try:
                 genai.configure(api_key=api_key)
-                prompt = f"""ERES EXPERTO CLÍNICO (Ref: Rezoagli 2025). 
-                Caso: {patologia}, FR {rr}, SpO2 {spo2}, FiO2 {fio2}, Glasgow {glasgow}, ROX {rox_index:.2f}.
-                Responde con:
-                1. Interfaz específica recomendada.
-                2. Parámetros de configuración inicial precisos (IPAP, EPAP, PS, FiO2, Flujo).
-                3. Signos de alarma para fracaso de terapia y criterios de IOT.
-                Se muy directo y usa formato Markdown."""
+                prompt = f"""ERES EXPERTO CLÍNICO. Contexto: {patologia}, FR {rr}, SpO2 {spo2}, FiO2 {fio2}, GCS {glasgow}, ROX {rox_index:.2f}, PaFi {pafi_ratio:.0f}.
+                Dame una recomendación clínica breve, priorizando seguridad del paciente, ajustes del ventilador y criterios de intubación si aplica. Formato Markdown."""
                 model = genai.GenerativeModel('gemini-3-flash-preview')
                 response = model.generate_content(prompt)
-                st.success("Recomendación de la IA:")
+                st.info("Recomendación IA:")
                 st.markdown(response.text)
             except Exception as e:
-                st.error(f"Error en la consulta: {str(e)}")
+                st.error(f"Error: {str(e)}")
