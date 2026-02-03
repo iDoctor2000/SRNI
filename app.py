@@ -16,11 +16,12 @@ st.set_page_config(
 # CSS AVANZADO: COMPACTACIÓN Y ESTILOS DE INFO
 st.markdown("""
     <style>
+    /* Ajuste del contenedor principal para evitar corte superior */
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 3rem !important;
         padding-bottom: 2rem !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
     
     div[data-testid="stVerticalBlock"] > div {
@@ -96,19 +97,29 @@ st.markdown("""
         color: #b91c1c;
     }
     
-    /* Estilos Header */
+    /* ESTILOS HEADER PERSONALIZADOS */
     .header-title {
-        margin-top: 0 !important;
-        padding-top: 0 !important;
-        font-weight: 800;
         color: #1e3a8a;
+        font-weight: 800;
+        font-size: 2.2rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.2 !important;
+        display: flex;
+        align-items: center;
+        height: 100%;
+        padding-top: 10px !important; /* Alineación visual con el logo */
     }
-    .header-subtitle {
+    
+    .logo-subtitle {
+        font-family: "Source Sans Pro", sans-serif;
         font-style: italic;
+        font-size: 0.7rem !important;
         color: #64748b;
-        font-size: 0.8rem;
         text-align: center;
-        margin-top: -5px;
+        margin-top: -2px;
+        line-height: 1;
+        width: 100%;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -187,17 +198,21 @@ api_key = get_api_key()
 # ==========================================
 # 4. INTERFAZ (HEADER)
 # ==========================================
-# Layout de cabecera con logo a la izquierda y títulos
-c_logo, c_text = st.columns([1, 5])
+
+# Ajustamos las columnas para reducir el tamaño del logo (ratio 1.2 a 8.8)
+c_logo, c_text = st.columns([1.2, 8.8])
 
 with c_logo:
     try:
+        # Logo responsive dentro de una columna estrecha
         st.image("IMG/SRNI.png", use_container_width=True)
-        st.markdown('<div class="header-subtitle">By iDoctor</div>', unsafe_allow_html=True)
+        # Subtítulo debajo del logo
+        st.markdown('<div class="logo-subtitle">By iDoctor</div>', unsafe_allow_html=True)
     except Exception:
         st.error("Logo?")
 
 with c_text:
+    # Título alineado
     st.markdown('<h1 class="header-title">Asistente SRNI</h1>', unsafe_allow_html=True)
 
 # ==========================================
@@ -213,7 +228,7 @@ with st.container(border=True):
         label_visibility="collapsed"
     )
 
-    # --- CUADRO DE RESUMEN DINÁMICO (ACTUALIZADO) ---
+    # --- CUADRO DE RESUMEN DINÁMICO ---
     # Solo mostramos el panel de referencia si se ha seleccionado una patología
     if patologia:
         ref = REFERENCIAS[patologia]
