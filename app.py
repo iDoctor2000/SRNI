@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import os
 import time
+import base64
 import streamlit.components.v1 as components
 from google.api_core import exceptions
 
@@ -9,11 +10,102 @@ from google.api_core import exceptions
 # 1. CONFIGURACIÓN ESTRATÉGICA
 # ==========================================
 st.set_page_config(
-    page_title="SRNI.app",
+    page_title="SRNI",
     page_icon="🫁",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
+
+# ==========================================
+# 1.1 CONFIGURACIÓN PWA (Mobile Icon Fix)
+# ==========================================
+def setup_pwa(icon_path):
+    """
+    Inyecta metadatos para que la app se vea bien al guardarla
+    en el escritorio de iOS/Android (Icono y Nombre).
+    Usa Base64 para evitar problemas de rutas de archivos.
+    """
+    try:
+        # 1. Leer imagen y convertir a Base64
+        with open(icon_path, "rb") as f:
+            icon_data = f.read()
+        icon_b64 = base64.b64encode(icon_data).decode()
+        icon_data_uri = f"data:image/png;base64,{icon_b64}"
+        
+        # 2. Crear manifiesto dinámico
+        manifest_json = f"""
+        {{
+            "name": "SRNI",
+            "short_name": "SRNI",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#2563eb",
+            "icons": [
+                {{
+                    "src": "{icon_data_uri}",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }}
+            ]
+        }}
+        """
+        manifest_b64 = base64.b64encode(manifest_json.encode()).decode()
+        manifest_data_uri = f"data:application/manifest+json;base64,{manifest_b64}"
+        
+        # 3. Script JS para inyectar etiquetas en el <head>
+        pwa_script = f"""
+        <script>
+            (function() {{
+                const head = document.head;
+                
+                // Función auxiliar para crear/actualizar links
+                function setLink(rel, href) {{
+                    let link = document.querySelector(`link[rel="${{rel}}"]`);
+                    if (!link) {{
+                        link = document.createElement('link');
+                        link.rel = rel;
+                        head.appendChild(link);
+                    }}
+                    link.href = href;
+                }}
+                
+                // Función auxiliar para meta tags
+                function setMeta(name, content) {{
+                    let meta = document.querySelector(`meta[name="${{name}}"]`);
+                    if (!meta) {{
+                        meta = document.createElement('meta');
+                        meta.name = name;
+                        head.appendChild(meta);
+                    }}
+                    meta.content = content;
+                }}
+
+                // --- IOS / APPLE ---
+                // Icono (El que sale en la pantalla de inicio)
+                setLink('apple-touch-icon', '{icon_data_uri}');
+                
+                // Nombre de la App debajo del icono
+                setMeta('apple-mobile-web-app-title', 'SRNI');
+                
+                // Modo pantalla completa
+                setMeta('apple-mobile-web-app-capable', 'yes');
+                setMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
+
+                // --- ANDROID / CHROME ---
+                // Manifiesto
+                setLink('manifest', '{manifest_data_uri}');
+            }})();
+        </script>
+        """
+        st.markdown(pwa_script, unsafe_allow_html=True)
+        
+    except Exception as e:
+        # Si falla (ej. no encuentra la imagen), no rompe la app
+        print(f"PWA Setup Error: {e}")
+
+# Ejecutar configuración PWA (Intenta leer la imagen local)
+setup_pwa("IMG/SRNI.png")
 
 # ==========================================
 # 2. CSS AVANZADO Y ESTILOS
