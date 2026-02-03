@@ -95,6 +95,21 @@ st.markdown("""
         font-size: 0.8rem;
         color: #b91c1c;
     }
+    
+    /* Estilos Header */
+    .header-title {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        font-weight: 800;
+        color: #1e3a8a;
+    }
+    .header-subtitle {
+        font-style: italic;
+        color: #64748b;
+        font-size: 0.8rem;
+        text-align: center;
+        margin-top: -5px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -172,11 +187,18 @@ api_key = get_api_key()
 # ==========================================
 # 4. INTERFAZ (HEADER)
 # ==========================================
-# Se muestra el logo de forma responsive, ocupando el ancho del contenedor
-try:
-    st.image("IMG/SRNI.png", use_container_width=True)
-except Exception:
-    st.error("No se pudo cargar la imagen del logo (IMG/SRNI.png).")
+# Layout de cabecera con logo a la izquierda y títulos
+c_logo, c_text = st.columns([1, 5])
+
+with c_logo:
+    try:
+        st.image("IMG/SRNI.png", use_container_width=True)
+        st.markdown('<div class="header-subtitle">By iDoctor</div>', unsafe_allow_html=True)
+    except Exception:
+        st.error("Logo?")
+
+with c_text:
+    st.markdown('<h1 class="header-title">Asistente SRNI</h1>', unsafe_allow_html=True)
 
 # ==========================================
 # 5. PANEL CENTRAL
