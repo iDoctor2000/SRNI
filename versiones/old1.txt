@@ -273,23 +273,22 @@ def render_gauge(value, title, min_val, max_val, thresholds, labels, inverse=Fal
     
     # Colores
     c_danger = "#ef4444" # Rojo
-    c_warn = "#94a3b8"   # Gris/Neutro
+    c_warn = "#f59e0b"   # Naranja/Amarillo oscuro
     c_safe = "#22c55e"   # Verde
     
-    if inverse: # Para casos donde menor es mejor
+    if inverse: # Para HACOR: Bajo es bueno (Verde), Medio (Naranja), Alto es malo (Rojo)
         col1, col2, col3 = c_safe, c_warn, c_danger
-    else: # ROX y PAFI: Bajo es malo (Rojo), Medio es alerta (Gris), Alto es bueno (Verde)
+    else: # ROX y PAFI: Bajo es malo (Rojo), Medio es alerta (Naranja), Alto es bueno (Verde)
         col1, col2, col3 = c_danger, c_warn, c_safe
 
     # Posición del marcador
     marker_left = pct_value
     
-    # IMPORTANTE: No indentar el HTML dentro de la f-string para evitar que Streamlit
-    # lo interprete como bloque de código Markdown.
+    # IMPORTANTE: No indentar el HTML dentro de la f-string
     html = f"""
 <div style="margin-bottom: 15px;">
     <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; font-size:0.9rem; color:#334155;">
-        <span>{title}: <span style="font-size:1.1rem; color:#1e3a8a;">{value:.2f}</span></span>
+        <span>{title}: <span style="font-size:1.1rem; color:#1e3a8a;">{value:.0f}</span></span>
     </div>
     <div style="position: relative; height: 24px; background: #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
         <div style="width: {width_seg1}%; background: {col1};" title="{labels[0]}"></div>
@@ -306,6 +305,41 @@ def render_gauge(value, title, min_val, max_val, thresholds, labels, inverse=Fal
 </div>
 """
     return html
+
+def calculate_hacor(ph, pafi, rr, hr, gcs):
+    score = 0
+    # pH
+    if ph >= 7.35: score += 0
+    elif 7.30 <= ph < 7.35: score += 2
+    elif 7.25 <= ph < 7.30: score += 3
+    else: score += 4 # < 7.25
+
+    # PaFi (PaO2/FiO2)
+    if pafi > 200: score += 0
+    elif 176 <= pafi <= 200: score += 2
+    elif 151 <= pafi <= 175: score += 3
+    elif 126 <= pafi <= 150: score += 4
+    elif 101 <= pafi <= 125: score += 5
+    else: score += 6 # <= 100
+
+    # RR (Frecuencia Respiratoria)
+    if rr <= 30: score += 0
+    elif 31 <= rr <= 35: score += 2
+    elif 36 <= rr <= 40: score += 3
+    elif 41 <= rr <= 45: score += 4
+    else: score += 5 # > 45
+
+    # HR (Frecuencia Cardiaca)
+    if hr <= 120: score += 0
+    else: score += 1
+
+    # GCS (Glasgow)
+    if gcs >= 15: score += 0
+    elif 13 <= gcs <= 14: score += 2
+    elif 11 <= gcs <= 12: score += 5
+    else: score += 10 # <= 10
+
+    return score
 
 # ==========================================
 # 4. LÓGICA DE REFERENCIA
@@ -482,14 +516,18 @@ with st.container(border=True):
 
     st.markdown("#### Monitorización") 
 
-    c1, c2, c3 = st.columns(3)
+    # Layout de 4 columnas para incluir FC
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.caption("Frec. Resp") 
-        rr = st.number_input("RR", 8, 60, 24, label_visibility="collapsed")
+        st.caption("F. Card (lpm)")
+        hr = st.number_input("FC", 30, 250, 90, label_visibility="collapsed")
     with c2:
+        st.caption("F. Resp (rpm)") 
+        rr = st.number_input("RR", 8, 60, 24, label_visibility="collapsed")
+    with c3:
         st.caption("SpO2 (%)")
         spo2 = st.number_input("SpO2", 50, 100, 90, label_visibility="collapsed")
-    with c3:
+    with c4:
         st.caption("Glasgow")
         glasgow = st.number_input("GCS", 3, 15, 15, label_visibility="collapsed")
 
@@ -498,7 +536,7 @@ with st.container(border=True):
     with c_fio_val: st.markdown(f"**{st.session_state.get('fio2_val', 50)}%**")
     fio2 = st.slider("FiO2", 21, 100, 50, key="fio2_val", label_visibility="collapsed")
 
-    with st.expander("🧪 Gasometría (Opcional)", expanded=False):
+    with st.expander("🧪 Gasometría (Requerido para HACOR)", expanded=False):
         g1, g2, g3 = st.columns(3)
         ph = g1.number_input("pH", 6.80, 7.80, 7.35, step=0.01)
         pco2 = g2.number_input("pCO2", 10, 150, 45)
@@ -510,25 +548,38 @@ with st.container(border=True):
 # Cálculos
 rox_index = (spo2 / (fio2/100)) / rr if rr > 0 else 0
 pafi_ratio = po2 / (fio2/100) if fio2 > 0 else 0
+hacor_score = calculate_hacor(ph, pafi_ratio, rr, hr, glasgow)
 
 st.write("")
 st.markdown("### 📊 Índices de Seguridad")
 
 # Renderizar Gráfico ROX
-# Escala visual: 0 a 10 (aprox, para que se vea bien). Cortes: 2.85 y 4.88
 html_rox = render_gauge(
     value=rox_index,
     title="Índice ROX",
     min_val=0,
-    max_val=12, # Un poco más de 10 para margen
+    max_val=12,
     thresholds=[2.85, 4.88],
     labels=["Alto Riesgo (<2.85)", "Vigilancia (2.85-4.88)", "Bajo Riesgo (>4.88)"],
     inverse=False
 )
 st.markdown(html_rox, unsafe_allow_html=True)
 
+# Renderizar Gráfico HACOR
+# Puntos de corte: <= 5 éxito, > 5 fallo.
+# Usamos thresholds [5, 10] para mostrar gradiente
+html_hacor = render_gauge(
+    value=hacor_score,
+    title="Índice HACOR (1h VNI)",
+    min_val=0,
+    max_val=25,
+    thresholds=[5, 10], 
+    labels=["Éxito (≤5)", "Riesgo (>5)", "Fallo (>10)"],
+    inverse=True # Inverso: Bajo es bueno, Alto es malo
+)
+st.markdown(html_hacor, unsafe_allow_html=True)
+
 # Renderizar Gráfico PaFi
-# Escala visual: 0 a 500. Cortes: 150 y 300 (SDRA Mod-Sev vs Leve vs No)
 html_pafi = render_gauge(
     value=pafi_ratio,
     title="PaFi Ratio",
@@ -553,8 +604,11 @@ if st.button("🧠 OBTENER RECOMENDACIÓN IA PERSONALIZADA"):
         with st.spinner("Analizando..."):
             try:
                 genai.configure(api_key=api_key)
-                prompt = f"""ERES EXPERTO CLÍNICO. Contexto: {patologia}, FR {rr}, SpO2 {spo2}, FiO2 {fio2}, GCS {glasgow}, ROX {rox_index:.2f}, PaFi {pafi_ratio:.0f}.
-                Dame una recomendación clínica breve, priorizando seguridad del paciente, ajustes del ventilador y criterios de intubación si aplica. Formato Markdown."""
+                prompt = f"""ERES EXPERTO CLÍNICO. Contexto: {patologia}, FR {rr}, FC {hr}, SpO2 {spo2}, FiO2 {fio2}, GCS {glasgow}, pH {ph}, pO2 {po2}.
+                Índices Calculados: ROX {rox_index:.2f}, PaFi {pafi_ratio:.0f}, HACOR {hacor_score}.
+                Dame una recomendación clínica breve.
+                IMPORTANTE: Si HACOR > 5 tras 1h de VNI, alerta sobre alto riesgo de fracaso e intubación.
+                Prioriza seguridad del paciente, ajustes del ventilador. Formato Markdown."""
                 model = genai.GenerativeModel('gemini-3-flash-preview')
                 response = model.generate_content(prompt)
                 st.info("Recomendación IA:")
