@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit as st
 import google.generativeai as genai
 import os
 from google.api_core import exceptions
@@ -44,14 +43,6 @@ st.markdown("""
     
     .stNumberInput input { height: 2rem; text-align: center !important; }
     
-    .header-box {
-        background-color: white;
-        padding: 12px;
-        border-radius: 10px;
-        margin-bottom: 15px;
-        border-bottom: 2px solid #f1f5f9;
-    }
-
     /* Panel de Referencia Rápida */
     .ref-box {
         background-color: #f8fafc;
@@ -181,17 +172,11 @@ api_key = get_api_key()
 # ==========================================
 # 4. INTERFAZ (HEADER)
 # ==========================================
-st.markdown("""
-<div class="header-box">
-    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <span style="font-size: 2.2rem; line-height: 1;">🫁</span>
-        <div style="min-width: 150px;">
-            <h2 style="margin: 0; color: #1e3a8a; font-size: 1.5rem; line-height: 1.1;">SRNI.app</h2>
-            <div style="color: #64748b; font-size: 0.8rem; font-weight: 600;">By iDoctor</div>
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# Se muestra el logo de forma responsive, ocupando el ancho del contenedor
+try:
+    st.image("IMG/SRNI.png", use_container_width=True)
+except Exception:
+    st.error("No se pudo cargar la imagen del logo (IMG/SRNI.png).")
 
 # ==========================================
 # 5. PANEL CENTRAL
@@ -201,41 +186,47 @@ with st.container(border=True):
     patologia = st.selectbox(
         "Sospecha Clínica",
         list(REFERENCIAS.keys()),
+        index=None,
+        placeholder="Enfermedad Representativa...",
         label_visibility="collapsed"
     )
 
     # --- CUADRO DE RESUMEN DINÁMICO (ACTUALIZADO) ---
-    ref = REFERENCIAS[patologia]
-    st.markdown(f"""
-    <div class="ref-box">
-        <div class="ref-title">📋 Configuración Inicial: {ref['terapia']}</div>
-        <div class="param-grid">
-            <div class="param-item">
-                <span class="param-label">IPAP</span>
-                <span class="param-value">{ref['ipap']}</span>
+    # Solo mostramos el panel de referencia si se ha seleccionado una patología
+    if patologia:
+        ref = REFERENCIAS[patologia]
+        st.markdown(f"""
+        <div class="ref-box">
+            <div class="ref-title">📋 Configuración Inicial: {ref['terapia']}</div>
+            <div class="param-grid">
+                <div class="param-item">
+                    <span class="param-label">IPAP</span>
+                    <span class="param-value">{ref['ipap']}</span>
+                </div>
+                <div class="param-item">
+                    <span class="param-label">EPAP / PEEP</span>
+                    <span class="param-value">{ref['epap']}</span>
+                </div>
+                <div class="param-item">
+                    <span class="param-label">P. Soporte</span>
+                    <span class="param-value">{ref['ps']}</span>
+                </div>
+                <div class="param-item">
+                    <span class="param-label">FiO2</span>
+                    <span class="param-value">{ref['fio2']}</span>
+                </div>
+                <div class="param-item">
+                    <span class="param-label">Vol. Corriente</span>
+                    <span class="param-value">{ref['vt']}</span>
+                </div>
             </div>
-            <div class="param-item">
-                <span class="param-label">EPAP / PEEP</span>
-                <span class="param-value">{ref['epap']}</span>
-            </div>
-            <div class="param-item">
-                <span class="param-label">P. Soporte</span>
-                <span class="param-value">{ref['ps']}</span>
-            </div>
-            <div class="param-item">
-                <span class="param-label">FiO2</span>
-                <span class="param-value">{ref['fio2']}</span>
-            </div>
-            <div class="param-item">
-                <span class="param-label">Vol. Corriente</span>
-                <span class="param-value">{ref['vt']}</span>
+            <div class="safety-alert">
+                🚨 <b>Aspectos de Seguridad:</b> {ref['seguridad']}
             </div>
         </div>
-        <div class="safety-alert">
-            🚨 <b>Aspectos de Seguridad:</b> {ref['seguridad']}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+    else:
+        st.info("👆 Seleccione una enfermedad representativa para ver la referencia clínica.")
 
     st.markdown("---") 
 
@@ -289,6 +280,8 @@ r2.metric("PaFi Ratio", f"{pafi_ratio:.0f}", delta_color=pafi_color)
 if st.button("🧠 OBTENER RECOMENDACIÓN IA PERSONALIZADA"):
     if not api_key:
         st.error("⚠️ API Key no detectada. Verifique configuración.")
+    elif not patologia:
+        st.warning("⚠️ Por favor, seleccione una Enfermedad Representativa antes de consultar a la IA.")
     else:
         with st.spinner("Gemini analizando el contexto clínico..."):
             try:
