@@ -17,284 +17,250 @@ st.set_page_config(
 )
 
 # ==========================================
-# 1.1 CONFIGURACIÓN PWA (Iconos Móviles)
+# 1.1 CONFIGURACIÓN PWA (Mobile Icon Fix)
 # ==========================================
-def get_base64_image(image_path):
-    """Lee una imagen y devuelve su representación en base64."""
-    try:
-        with open(image_path, "rb") as f:
-            icon_data = f.read()
-        return base64.b64encode(icon_data).decode()
-    except Exception:
-        return ""
-
 def setup_pwa(icon_path):
     """
-    Inyecta metadatos para mejorar la experiencia en iOS y Android.
+    Inyecta metadatos para que la app se vea bien al guardarla
+    en el escritorio de iOS/Android (Icono y Nombre).
+    Usa Base64 para evitar problemas de rutas de archivos.
     """
-    icon_b64 = get_base64_image(icon_path)
-    if not icon_b64:
-        return
-
-    icon_data_uri = f"data:image/png;base64,{icon_b64}"
-    
-    # Crear manifiesto dinámico
-    manifest_json = f"""
-    {{
-        "name": "SRNI",
-        "short_name": "SRNI",
-        "start_url": ".",
-        "display": "standalone",
-        "background_color": "#ffffff",
-        "theme_color": "#2563eb",
-        "icons": [
-            {{
-                "src": "{icon_data_uri}",
-                "sizes": "192x192",
-                "type": "image/png"
-            }}
-        ]
-    }}
-    """
-    manifest_b64 = base64.b64encode(manifest_json.encode()).decode()
-    manifest_data_uri = f"data:application/manifest+json;base64,{manifest_b64}"
-    
-    # Script JS para inyectar etiquetas en el head
-    pwa_script = f"""
-    <script>
-        (function() {{
-            const head = document.head;
-            
-            function setLink(rel, href) {{
-                let link = document.querySelector(`link[rel="${{rel}}"]`);
-                if (!link) {{
-                    link = document.createElement('link');
-                    link.rel = rel;
-                    head.appendChild(link);
+    try:
+        # 1. Leer imagen y convertir a Base64
+        with open(icon_path, "rb") as f:
+            icon_data = f.read()
+        icon_b64 = base64.b64encode(icon_data).decode()
+        icon_data_uri = f"data:image/png;base64,{icon_b64}"
+        
+        # 2. Crear manifiesto dinámico
+        manifest_json = f"""
+        {{
+            "name": "SRNI",
+            "short_name": "SRNI",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#2563eb",
+            "icons": [
+                {{
+                    "src": "{icon_data_uri}",
+                    "sizes": "192x192",
+                    "type": "image/png"
                 }}
-                link.href = href;
-            }}
-            
-            function setMeta(name, content) {{
-                let meta = document.querySelector(`meta[name="${{name}}"]`);
-                if (!meta) {{
-                    meta = document.createElement('meta');
-                    meta.name = name;
-                    head.appendChild(meta);
+            ]
+        }}
+        """
+        manifest_b64 = base64.b64encode(manifest_json.encode()).decode()
+        manifest_data_uri = f"data:application/manifest+json;base64,{manifest_b64}"
+        
+        # 3. Script JS para inyectar etiquetas en el <head>
+        pwa_script = f"""
+        <script>
+            (function() {{
+                const head = document.head;
+                
+                // Función auxiliar para crear/actualizar links
+                function setLink(rel, href) {{
+                    let link = document.querySelector(`link[rel="${{rel}}"]`);
+                    if (!link) {{
+                        link = document.createElement('link');
+                        link.rel = rel;
+                        head.appendChild(link);
+                    }}
+                    link.href = href;
                 }}
-                meta.content = content;
-            }}
+                
+                // Función auxiliar para meta tags
+                function setMeta(name, content) {{
+                    let meta = document.querySelector(`meta[name="${{name}}"]`);
+                    if (!meta) {{
+                        meta = document.createElement('meta');
+                        meta.name = name;
+                        head.appendChild(meta);
+                    }}
+                    meta.content = content;
+                }}
 
-            setLink('apple-touch-icon', '{icon_data_uri}');
-            setMeta('apple-mobile-web-app-title', 'SRNI');
-            setMeta('apple-mobile-web-app-capable', 'yes');
-            setMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
-            setLink('manifest', '{manifest_data_uri}');
-        }})();
-    </script>
-    """
-    st.markdown(pwa_script, unsafe_allow_html=True)
+                // --- IOS / APPLE ---
+                // Icono (El que sale en la pantalla de inicio)
+                setLink('apple-touch-icon', '{icon_data_uri}');
+                
+                // Nombre de la App debajo del icono
+                setMeta('apple-mobile-web-app-title', 'SRNI');
+                
+                // Modo pantalla completa
+                setMeta('apple-mobile-web-app-capable', 'yes');
+                setMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
 
-# Ejecutar configuración PWA
+                // --- ANDROID / CHROME ---
+                // Manifiesto
+                setLink('manifest', '{manifest_data_uri}');
+            }})();
+        </script>
+        """
+        st.markdown(pwa_script, unsafe_allow_html=True)
+        
+    except Exception as e:
+        # Si falla (ej. no encuentra la imagen), no rompe la app
+        print(f"PWA Setup Error: {e}")
+
+# Ejecutar configuración PWA (Intenta leer la imagen local)
 setup_pwa("IMG/SRNI.png")
 
 # ==========================================
-# 2. CSS AVANZADO Y ESTILOS (RESPONSIVE)
+# 2. CSS AVANZADO Y ESTILOS
 # ==========================================
 st.markdown("""
     <style>
-    /* 1. Ajuste global del contenedor (Maximizar espacio útil) */
+    /* Ajuste del contenedor principal */
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 3rem !important;
         padding-bottom: 3rem !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-        max-width: 100% !important;
     }
     
-    /* 2. Header Personalizado (HTML/Flexbox) */
-    .header-container {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding-bottom: 10px;
-        margin-bottom: 15px;
-        border-bottom: 1px solid #f1f5f9;
-    }
-    .header-logo {
-        width: 48px;  /* Tamaño fijo pequeño para móvil */
-        height: 48px;
-        object-fit: contain;
-        flex-shrink: 0;
-    }
-    .header-text {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
-    .header-title {
-        margin: 0;
-        color: #1e3a8a;
-        font-size: 1.3rem;
-        font-weight: 800;
-        line-height: 1.2;
-    }
-    .header-subtitle {
-        margin: 0;
-        color: #64748b;
-        font-size: 0.75rem;
-        font-weight: 500;
+    /* Espaciado entre elementos */
+    div[data-testid="stVerticalBlock"] > div {
+        gap: 0.8rem !important;
     }
     
-    /* 3. Inputs Numéricos ULTRA COMPACTOS */
-    /* Selectores robustos para ocultar botones +/- */
-    button[data-testid="stNumberInputStepDown"],
-    button[data-testid="stNumberInputStepUp"],
-    div[data-testid="stNumberInput"] button {
-        display: none !important;
-        width: 0 !important;
-        visibility: hidden !important;
+    /* ESTILO DE LA CAJA PRINCIPAL (CONTENEDOR) */
+    /* Apuntamos al contenedor con borde */
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        background-color: #fff7ed !important; /* Naranja muy pálido */
+        border: 1px solid #fed7aa !important; /* Borde naranja suave */
+        border-radius: 12px !important;
+        padding: 20px !important;
+        margin-top: 25px !important; /* Separación del título */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
     
-    /* Input Box styling */
-    div[data-testid="stNumberInput"] input {
-        text-align: center !important;
-        padding: 0px 5px !important;
-        font-size: 1.1rem !important;
-        font-weight: 700 !important;
-        color: #1e3a8a !important;
-        height: 2.2rem !important; /* Altura compacta */
-        border-radius: 8px !important;
-        border: 1px solid #cbd5e1 !important;
-    }
-    div[data-testid="stNumberInput"] input:focus {
-        border-color: #2563eb !important;
-        box-shadow: 0 0 0 1px #2563eb !important;
-    }
-
-    /* Reducir espacio entre label y input */
-    div[data-testid="stNumberInput"] {
-        margin-bottom: 0px !important;
-    }
-    
-    /* Etiquetas pequeñas y centradas */
-    .compact-label {
-        font-size: 0.65rem !important;
-        color: #64748b;
-        font-weight: 700;
-        text-align: center;
-        margin-bottom: 2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    /* 4. Tarjeta de Referencia */
-    .ref-box {
-        background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-left: 4px solid #2563eb;
-        padding: 10px;
+    /* Botones */
+    .stButton>button {
+        width: 100%;
         border-radius: 8px;
-        margin-bottom: 15px;
+        height: 3rem;
+        font-weight: 700;
+        background-color: #2563eb;
+        color: white;
+        margin-top: 10px;
+        border: none;
+    }
+    .stButton>button:hover {
+        background-color: #1d4ed8;
+    }
+    
+    /* Inputs numéricos */
+    .stNumberInput input { height: 2rem; text-align: center !important; }
+    
+    /* Panel de Referencia Rápida */
+    .ref-box {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-left: 5px solid #2563eb;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
     }
     .ref-title {
         font-weight: 800;
         color: #1e3a8a;
-        font-size: 0.85rem;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        font-size: 0.9rem;
         display: flex;
-        justify-content: space-between;
         align-items: center;
+        gap: 8px;
     }
-    
     .param-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); 
-        gap: 5px; 
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 8px;
+        margin-top: 5px;
     }
-    
     .param-item {
-        background: white;
-        padding: 4px;
+        background: #f8fafc;
+        padding: 6px 10px;
         border-radius: 6px;
-        border: 1px solid #cbd5e1;
+        border: 1px solid #f1f5f9;
+        font-size: 0.8rem;
         text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
     }
     .param-label {
-        font-size: 0.55rem;
-        color: #64748b;
         font-weight: 700;
+        color: #64748b;
+        display: block;
+        font-size: 0.7rem;
         text-transform: uppercase;
-        margin-bottom: 1px;
     }
     .param-value {
-        font-size: 0.75rem;
-        color: #0f172a;
-        font-weight: 700;
-        line-height: 1.1;
-    }
-
-    /* 5. Contenedor Principal */
-    div[data-testid="stVerticalBlockBorderWrapper"] > div {
-        background-color: #ffffff !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 12px !important;
-        padding: 12px !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    }
-
-    /* 6. Cronómetro */
-    .timer-display {
-        font-family: 'Courier New', monospace;
-        background: #0f172a;
-        color: #4ade80;
-        border-radius: 6px;
-        text-align: center;
-        font-size: 1.1rem;
-        font-weight: 700;
-        padding: 6px 0;
-        letter-spacing: 1px;
-    }
-
-    /* 7. Botones */
-    .stButton > button {
-        border-radius: 8px;
+        color: #1e293b;
         font-weight: 600;
-        border: none;
-        padding: 0.4rem 1rem;
-        min-height: 2.2rem;
+        font-size: 0.9rem;
+    }
+    .safety-alert {
+        margin-top: 12px;
+        padding-top: 8px;
+        border-top: 1px dashed #cbd5e1;
+        font-size: 0.8rem;
+        color: #b91c1c;
     }
     
-    /* 8. Ajustes para Sliders */
-    div[data-testid="stSlider"] {
-        padding-top: 0px !important;
-        padding-bottom: 10px !important;
+    /* Header Styles */
+    .header-title {
+        color: #1e3a8a;
+        font-weight: 800;
+        font-size: 2.2rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.2 !important;
+        display: flex;
+        align-items: center;
+        height: 100%;
+        padding-top: 10px !important;
+    }
+    .header-subtitle-inline {
+        font-family: "Source Sans Pro", sans-serif;
+        font-style: italic;
+        font-size: 1rem !important; 
+        color: #64748b;
+        font-weight: 400;
+        margin-left: 10px;
+        padding-top: 8px;
     }
     
-    /* Forzar ocultamiento de flechas en Firefox/Chrome nativo si se cuelan */
-    input[type=number]::-webkit-inner-spin-button, 
-    input[type=number]::-webkit-outer-spin-button { 
-        -webkit-appearance: none; 
-        margin: 0; 
+    /* Estilos para el Cronómetro */
+    .timer-container {
+        font-family: 'Courier New', monospace;
+        background: #1e293b;
+        color: #22c55e;
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        border: 2px solid #475569;
+        margin-bottom: 10px;
+        letter-spacing: 2px;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. FUNCIONES AUXILIARES
+# 3. FUNCIONES AUXILIARES (GRÁFICOS)
 # ==========================================
 
 def render_gauge(value, title, min_val, max_val, thresholds, labels, inverse=False):
+    """
+    Genera una barra de progreso visual HTML/CSS (Gauge lineal)
+    thresholds: [limite_bajo, limite_alto]
+    """
+    # Normalizar valor para el ancho (0-100%)
     range_span = max_val - min_val
     pct_value = ((value - min_val) / range_span) * 100
-    pct_value = max(0, min(100, pct_value))
+    pct_value = max(0, min(100, pct_value)) # Clampar entre 0 y 100
     
+    # Calcular anchos de segmentos
+    # Asumimos estructura: Rojo | Gris | Verde (o invertido)
     t1 = thresholds[0]
     t2 = thresholds[1]
     
@@ -305,73 +271,134 @@ def render_gauge(value, title, min_val, max_val, thresholds, labels, inverse=Fal
     width_seg2 = pct_t2 - pct_t1
     width_seg3 = 100 - pct_t2
     
-    c_danger, c_warn, c_safe = "#ef4444", "#f59e0b", "#22c55e"
-    if inverse: col1, col2, col3 = c_safe, c_warn, c_danger
-    else: col1, col2, col3 = c_danger, c_warn, c_safe
-
-    marker_left = pct_value
-    label_left = labels[0]
-    label_right = labels[-1]
+    # Colores
+    c_danger = "#ef4444" # Rojo
+    c_warn = "#f59e0b"   # Naranja/Amarillo oscuro
+    c_safe = "#22c55e"   # Verde
     
+    if inverse: # Para HACOR: Bajo es bueno (Verde), Medio (Naranja), Alto es malo (Rojo)
+        col1, col2, col3 = c_safe, c_warn, c_danger
+    else: # ROX y PAFI: Bajo es malo (Rojo), Medio es alerta (Naranja), Alto es bueno (Verde)
+        col1, col2, col3 = c_danger, c_warn, c_safe
+
+    # Posición del marcador
+    marker_left = pct_value
+    
+    # IMPORTANTE: No indentar el HTML dentro de la f-string
     html = f"""
-    <div style="margin-top: 8px; margin-bottom: 4px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:2px; font-weight:700; font-size:0.75rem; color:#334155;">
-            <span>{title}</span>
-            <span style="color:#1e3a8a;">{value:.1f}</span>
-        </div>
-        <div style="position: relative; height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; display: flex;">
-            <div style="width: {width_seg1}%; background: {col1};"></div>
-            <div style="width: {width_seg2}%; background: {col2};"></div>
-            <div style="width: {width_seg3}%; background: {col3};"></div>
-            <div style="position: absolute; left: calc({marker_left}% - 2px); top: 0; bottom: 0; width: 4px; background: #0f172a; border: 1px solid white;"></div>
-        </div>
-        <div style="display:flex; justify-content:space-between; font-size:0.6rem; color:#94a3b8; margin-top:2px;">
-            <span>{label_left}</span>
-            <span>{label_right}</span>
-        </div>
+<div style="margin-bottom: 15px;">
+    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; font-size:0.9rem; color:#334155;">
+        <span>{title}: <span style="font-size:1.1rem; color:#1e3a8a;">{value:.0f}</span></span>
     </div>
-    """
+    <div style="position: relative; height: 24px; background: #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+        <div style="width: {width_seg1}%; background: {col1};" title="{labels[0]}"></div>
+        <div style="width: {width_seg2}%; background: {col2};" title="{labels[1]}"></div>
+        <div style="width: {width_seg3}%; background: {col3};" title="{labels[2]}"></div>
+        <div style="position: absolute; left: calc({marker_left}% - 2px); top: 0; bottom: 0; width: 4px; background: #000; border: 1px solid white; z-index: 10;"></div>
+        <div style="position: absolute; left: calc({marker_left}% - 12px); top: -2px; font-size: 18px; line-height:1; color: black; z-index: 11; text-shadow: 0 0 2px white;">⬇</div>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#64748b; margin-top:2px;">
+        <span style="width:{width_seg1}%; text-align:center;">{labels[0]}</span>
+        <span style="width:{width_seg2}%; text-align:center;">{labels[1]}</span>
+        <span style="width:{width_seg3}%; text-align:center;">{labels[2]}</span>
+    </div>
+</div>
+"""
     return html
 
 def calculate_hacor(ph, pafi, rr, hr, gcs):
     score = 0
     # pH
-    if ph < 7.25: score += 4
-    elif ph < 7.30: score += 3
-    elif ph < 7.35: score += 2
-    
-    # PaFi
-    if pafi <= 100: score += 6
-    elif pafi <= 125: score += 5
-    elif pafi <= 150: score += 4
-    elif pafi <= 175: score += 3
-    elif pafi <= 200: score += 2
-    
-    # RR
-    if rr > 45: score += 5
-    elif rr > 40: score += 4
-    elif rr > 35: score += 3
-    elif rr > 30: score += 2
-    
-    # HR
-    if hr > 120: score += 1
-    
-    # GCS
-    if gcs <= 10: score += 10
-    elif gcs <= 12: score += 5
-    elif gcs <= 14: score += 2
-    
+    if ph >= 7.35: score += 0
+    elif 7.30 <= ph < 7.35: score += 2
+    elif 7.25 <= ph < 7.30: score += 3
+    else: score += 4 # < 7.25
+
+    # PaFi (PaO2/FiO2)
+    if pafi > 200: score += 0
+    elif 176 <= pafi <= 200: score += 2
+    elif 151 <= pafi <= 175: score += 3
+    elif 126 <= pafi <= 150: score += 4
+    elif 101 <= pafi <= 125: score += 5
+    else: score += 6 # <= 100
+
+    # RR (Frecuencia Respiratoria)
+    if rr <= 30: score += 0
+    elif 31 <= rr <= 35: score += 2
+    elif 36 <= rr <= 40: score += 3
+    elif 41 <= rr <= 45: score += 4
+    else: score += 5 # > 45
+
+    # HR (Frecuencia Cardiaca)
+    if hr <= 120: score += 0
+    else: score += 1
+
+    # GCS (Glasgow)
+    if gcs >= 15: score += 0
+    elif 13 <= gcs <= 14: score += 2
+    elif 11 <= gcs <= 12: score += 5
+    else: score += 10 # <= 10
+
     return score
 
 # ==========================================
-# 4. DATOS DE REFERENCIA
+# 4. LÓGICA DE REFERENCIA
 # ==========================================
 REFERENCIAS = {
-    "Fallo Hipoxémico": {"terapia": "Alto Flujo", "ipap": "-", "epap": "5-10", "ps": "-", "fio2": "92-96%", "vt": "P-SILI", "seguridad": "ROX < 4.88: Intubar"},
-    "EAP (Edema Pulmón)": {"terapia": "CPAP/BiPAP", "ipap": "12-16", "epap": "8-12", "ps": "4-8", "fio2": ">90%", "vt": "6-8ml", "seguridad": "Vigilar shock"},
-    "EPOC Agudizado": {"terapia": "BiPAP", "ipap": "10-14", "epap": "4-6", "ps": "6-10", "fio2": "88-92%", "vt": "6-8ml", "seguridad": "pH > 7.35 meta"},
-    "Inmunosuprimido": {"terapia": "HFNT/VNI", "ipap": "12-15", "epap": "5-8", "ps": "7-10", "fio2": "Min", "vt": "<8ml", "seguridad": "Intubación precoz"},
-    "Trauma Torácico": {"terapia": "CPAP/VNI", "ipap": "12-14", "epap": "5-10", "ps": "6-8", "fio2": "Variable", "vt": "7-9ml", "seguridad": "Analgesia clave"}
+    "Fallo Hipoxémico de Novo": {
+        "terapia": "Alto Flujo (HFNT)",
+        "ipap": "N/A",
+        "epap": "PEEP 5-10*",
+        "ps": "N/A",
+        "fio2": "92-96% SpO2",
+        "vt": "Monit. P-SILI",
+        "seguridad": "Si ROX < 4.88 (2-6h) considerar intubación inmediata. Riesgo de fatiga silente."
+    },
+    "Edema Agudo Pulmón (EAP)": {
+        "terapia": "CPAP / BiPAP",
+        "ipap": "12-16 cmH2O",
+        "epap": "8-12 cmH2O",
+        "ps": "4-8 cmH2O",
+        "fio2": ">90% SpO2",
+        "vt": "6-8 ml/kg",
+        "seguridad": "Respuesta rápida esperada. Vigilar estabilidad hemodinámica y precarga."
+    },
+    "EPOC / Hipercapnia": {
+        "terapia": "VNI (BiPAP)",
+        "ipap": "10-14 cmH2O",
+        "epap": "4-6 cmH2O",
+        "ps": "6-10 cmH2O",
+        "fio2": "88-92% SpO2",
+        "vt": "6-8 ml/kg",
+        "seguridad": "Objetivo: pH > 7.35. Evitar alcalosis respiratoria por sobre-asistencia."
+    },
+    "Inmunocomprometido": {
+        "terapia": "HFNT + VNI interm.",
+        "ipap": "12-15 cmH2O",
+        "epap": "5-8 cmH2O",
+        "ps": "7-10 cmH2O",
+        "fio2": "Conservadora",
+        "vt": "< 8 ml/kg",
+        "seguridad": "Evitar intubación si es posible (alto riesgo infeccioso), pero no retrasar si falla."
+    },
+    "Traumatismo Torácico": {
+        "terapia": "VNI / CPAP",
+        "ipap": "12-14 cmH2O",
+        "epap": "5-10 cmH2O",
+        "ps": "6-8 cmH2O",
+        "fio2": "Titular SpO2",
+        "vt": "7-9 ml/kg",
+        "seguridad": "Control de dolor fundamental. Descartar neumotórax antes de aplicar presión positiva."
+    },
+    "Otro": {
+        "terapia": "Individualizar",
+        "ipap": "10-12 cmH2O",
+        "epap": "5 cmH2O",
+        "ps": "5-7 cmH2O",
+        "fio2": "50% inicial",
+        "vt": "6 ml/kg",
+        "seguridad": "Monitorización estrecha de la mecánica pulmonar y esfuerzo inspiratorio."
+    }
 }
 
 def get_api_key():
@@ -383,157 +410,208 @@ def get_api_key():
 api_key = get_api_key()
 
 # ==========================================
-# 5. HEADER COMPACTO (HTML/CSS)
+# 5. HEADER
 # ==========================================
-# Generar imagen en base64 para insertar directamente en HTML
-img_b64 = get_base64_image("IMG/SRNI.png")
-if img_b64:
-    img_tag = f'<img src="data:image/png;base64,{img_b64}" class="header-logo">'
-else:
-    img_tag = '<div class="header-logo" style="display:flex;align-items:center;font-size:2rem;">🫁</div>'
-
-st.markdown(f"""
-    <div class="header-container">
-        {img_tag}
-        <div class="header-text">
-            <h3 class="header-title">Asistente SRNI</h3>
-            <p class="header-subtitle">Soporte Respiratorio | iDoctor</p>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+c_logo, c_text = st.columns([1.2, 8.8])
+with c_logo:
+    try:
+        st.image("IMG/SRNI.png", use_container_width=True)
+    except Exception:
+        st.error("Logo?")
+with c_text:
+    st.markdown('<h1 class="header-title">Asistente SRNI <span class="header-subtitle-inline">By iDoctor</span></h1>', unsafe_allow_html=True)
 
 # ==========================================
-# 6. INTERFAZ PRINCIPAL
+# 6. PANEL CENTRAL
 # ==========================================
-
-# --- CRONÓMETRO ---
-col_t_btn, col_t_display = st.columns([1, 2], gap="small")
-with col_t_btn:
-    if 'timer_active' not in st.session_state: st.session_state.timer_active = False
-    if 'start_time_ts' not in st.session_state: st.session_state.start_time_ts = 0.0
-    
-    btn_label = "⏹ Parar" if st.session_state.timer_active else "▶ Iniciar"
-    type_btn = "secondary" if st.session_state.timer_active else "primary"
-    
-    if st.button(btn_label, type=type_btn, use_container_width=True):
-        st.session_state.timer_active = not st.session_state.timer_active
-        if st.session_state.timer_active: st.session_state.start_time_ts = time.time()
-
-with col_t_display:
-    if st.session_state.timer_active:
-        start_ts_js = st.session_state.start_time_ts * 1000 
-        components.html(
-            f"""<div id="clock" style="font-family:'Courier New';background:#0f172a;color:#4ade80;border-radius:6px;text-align:center;font-size:1.1rem;font-weight:700;padding:6px 0;">00:00:00</div>
-            <script>
-                var start = {start_ts_js};
-                setInterval(function() {{
-                    var dist = new Date().getTime() - start;
-                    var h = Math.floor((dist % 86400000) / 3600000);
-                    var m = Math.floor((dist % 3600000) / 60000);
-                    var s = Math.floor((dist % 60000) / 1000);
-                    document.getElementById("clock").innerHTML = (h<10?"0"+h:h) + ":" + (m<10?"0"+m:m) + ":" + (s<10?"0"+s:s);
-                }}, 1000);
-            </script>""", height=40)
-    else:
-        st.markdown('<div class="timer-display">00:00:00</div>', unsafe_allow_html=True)
-
-# --- SELECTOR PATOLOGÍA ---
-patologia = st.selectbox("Patología", list(REFERENCIAS.keys()), index=None, placeholder="Seleccionar patología...", label_visibility="collapsed")
-
-if patologia:
-    ref = REFERENCIAS[patologia]
-    st.markdown(f"""
-    <div class="ref-box">
-        <div class="ref-title">
-            <span>{patologia}</span>
-            <span style="font-size:0.7rem; color:#64748b; font-weight:400;">{ref['terapia']}</span>
-        </div>
-        <div class="param-grid">
-            <div class="param-item"><span class="param-label">IPAP</span><span class="param-value">{ref['ipap']}</span></div>
-            <div class="param-item"><span class="param-label">EPAP</span><span class="param-value">{ref['epap']}</span></div>
-            <div class="param-item"><span class="param-label">PS</span><span class="param-value">{ref['ps']}</span></div>
-            <div class="param-item"><span class="param-label">FiO2</span><span class="param-value">{ref['fio2']}</span></div>
-            <div class="param-item"><span class="param-label">VT</span><span class="param-value">{ref['vt']}</span></div>
-        </div>
-        <div style="margin-top:5px; font-size:0.7rem; color:#b91c1c; font-weight:600;">⚠ {ref['seguridad']}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# --- MONITORIZACIÓN (GRID 2x2 para Móvil) ---
 with st.container(border=True):
-    st.caption("Monitorización (Signos Vitales)")
+    # --- CRONÓMETRO ---
+    st.markdown("### ⏱️ Tiempo de Terapia")
     
-    # Grid 2x2 manual para asegurar visualización en móvil
-    # Fila 1: FC y FR
-    r1_c1, r1_c2 = st.columns(2, gap="small")
-    with r1_c1:
-        st.markdown('<div class="compact-label">FC (lpm)</div>', unsafe_allow_html=True)
-        hr = st.number_input("FC", 0, 300, 90, label_visibility="collapsed")
-    with r1_c2:
-        st.markdown('<div class="compact-label">FR (rpm)</div>', unsafe_allow_html=True)
-        rr = st.number_input("RR", 0, 60, 24, label_visibility="collapsed")
-        
-    # Fila 2: SpO2 y Glasgow
-    r2_c1, r2_c2 = st.columns(2, gap="small")
-    with r2_c1:
-        st.markdown('<div class="compact-label">SpO2 (%)</div>', unsafe_allow_html=True)
-        spo2 = st.number_input("SpO2", 0, 100, 90, label_visibility="collapsed")
-    with r2_c2:
-        st.markdown('<div class="compact-label">GCS</div>', unsafe_allow_html=True)
+    # Control del estado del cronómetro en Python
+    if 'timer_active' not in st.session_state:
+        st.session_state.timer_active = False
+    if 'start_time_ts' not in st.session_state:
+        st.session_state.start_time_ts = 0.0
+
+    col_timer_disp, col_timer_btn = st.columns([3, 1])
+
+    with col_timer_btn:
+        if st.button("⏯️ Iniciar / Pausar", key="toggle_timer"):
+            if not st.session_state.timer_active:
+                st.session_state.timer_active = True
+                # Si es 0, empezamos de nuevo, si no, continuamos (lógica simple para este ejemplo)
+                if st.session_state.start_time_ts == 0:
+                    st.session_state.start_time_ts = time.time()
+                else:
+                    # Ajuste para pausar/reanudar requeriría más lógica, 
+                    # para simplificar "Iniciar" resetea al momento actual si estaba parado
+                    st.session_state.start_time_ts = time.time()
+            else:
+                st.session_state.timer_active = False
+                st.session_state.start_time_ts = 0 # Reset al parar
+
+    with col_timer_disp:
+        # Javascript para el contador en cliente (sin re-run de Streamlit)
+        if st.session_state.timer_active:
+            # Pasamos el timestamp de inicio a JS
+            start_ts_js = st.session_state.start_time_ts * 1000 
+            components.html(
+                f"""
+                <div id="clock" style="font-family: 'Courier New', monospace; background: #1e293b; color: #22c55e; padding: 10px; border-radius: 8px; text-align: center; font-size: 24px; font-weight: bold; border: 2px solid #475569; letter-spacing: 2px;">
+                    00:00:00
+                </div>
+                <script>
+                    var start = {start_ts_js};
+                    function update() {{
+                        var now = new Date().getTime();
+                        var distance = now - start;
+                        
+                        var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                        var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                        
+                        hours = hours < 10 ? "0" + hours : hours;
+                        minutes = minutes < 10 ? "0" + minutes : minutes;
+                        seconds = seconds < 10 ? "0" + seconds : seconds;
+                        
+                        document.getElementById("clock").innerHTML = hours + ":" + minutes + ":" + seconds;
+                    }}
+                    setInterval(update, 1000);
+                    update();
+                </script>
+                """,
+                height=60
+            )
+        else:
+             st.markdown('<div class="timer-container">00:00:00</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    patologia = st.selectbox(
+        "Sospecha Clínica",
+        list(REFERENCIAS.keys()),
+        index=None,
+        placeholder="Enfermedad Representativa...",
+        label_visibility="collapsed"
+    )
+
+    if patologia:
+        ref = REFERENCIAS[patologia]
+        st.markdown(f"""
+        <div class="ref-box">
+            <div class="ref-title">📋 Configuración: {ref['terapia']}</div>
+            <div class="param-grid">
+                <div class="param-item"><span class="param-label">IPAP</span><br><span class="param-value">{ref['ipap']}</span></div>
+                <div class="param-item"><span class="param-label">EPAP</span><br><span class="param-value">{ref['epap']}</span></div>
+                <div class="param-item"><span class="param-label">PS</span><br><span class="param-value">{ref['ps']}</span></div>
+                <div class="param-item"><span class="param-label">FiO2</span><br><span class="param-value">{ref['fio2']}</span></div>
+                <div class="param-item"><span class="param-label">VT</span><br><span class="param-value">{ref['vt']}</span></div>
+            </div>
+            <div class="safety-alert">🚨 {ref['seguridad']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("👆 Seleccione enfermedad para ver referencia.")
+
+    st.markdown("#### Monitorización") 
+
+    # Layout de 4 columnas para incluir FC
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.caption("F. Card (lpm)")
+        hr = st.number_input("FC", 30, 250, 90, label_visibility="collapsed")
+    with c2:
+        st.caption("F. Resp (rpm)") 
+        rr = st.number_input("RR", 8, 60, 24, label_visibility="collapsed")
+    with c3:
+        st.caption("SpO2 (%)")
+        spo2 = st.number_input("SpO2", 50, 100, 90, label_visibility="collapsed")
+    with c4:
+        st.caption("Glasgow")
         glasgow = st.number_input("GCS", 3, 15, 15, label_visibility="collapsed")
 
-    # FiO2 Slider
-    st.markdown('<div class="compact-label" style="text-align:left; margin-top:8px;">FiO2 Programada: <b>'+str(st.session_state.get('fio2_val', 50))+'%</b></div>', unsafe_allow_html=True)
+    c_fio_label, c_fio_val = st.columns([3,1])
+    with c_fio_label: st.caption("FiO2 Programada (%)")
+    with c_fio_val: st.markdown(f"**{st.session_state.get('fio2_val', 50)}%**")
     fio2 = st.slider("FiO2", 21, 100, 50, key="fio2_val", label_visibility="collapsed")
 
-    # Gasometría (Expandible)
-    with st.expander("Gasometría (pH, pCO2, pO2)", expanded=False):
-        g1, g2, g3 = st.columns(3, gap="small")
-        with g1:
-            st.markdown('<div class="compact-label">pH</div>', unsafe_allow_html=True)
-            ph = st.number_input("pH", 6.8, 7.8, 7.35, step=0.01, format="%.2f", label_visibility="collapsed")
-        with g2:
-            st.markdown('<div class="compact-label">pCO2</div>', unsafe_allow_html=True)
-            pco2 = st.number_input("pCO2", 10, 150, 45, label_visibility="collapsed")
-        with g3:
-            st.markdown('<div class="compact-label">pO2</div>', unsafe_allow_html=True)
-            po2 = st.number_input("pO2", 30, 300, 80, label_visibility="collapsed")
+    with st.expander("🧪 Gasometría (Requerido para HACOR)", expanded=False):
+        g1, g2, g3 = st.columns(3)
+        ph = g1.number_input("pH", 6.80, 7.80, 7.35, step=0.01)
+        pco2 = g2.number_input("pCO2", 10, 150, 45)
+        po2 = g3.number_input("pO2", 30, 300, 80)
 
 # ==========================================
-# 7. CÁLCULOS Y VISUALIZACIÓN
+# 7. RESULTADOS GRÁFICOS
 # ==========================================
+# Cálculos
 rox_index = (spo2 / (fio2/100)) / rr if rr > 0 else 0
 pafi_ratio = po2 / (fio2/100) if fio2 > 0 else 0
 hacor_score = calculate_hacor(ph, pafi_ratio, rr, hr, glasgow)
 
-col_g1, col_g2, col_g3 = st.columns(3, gap="small")
-with col_g1:
-    st.markdown(render_gauge(rox_index, "ROX", 0, 12, [2.85, 4.88], ["<2.85", ">4.88"]), unsafe_allow_html=True)
-with col_g2:
-    st.markdown(render_gauge(hacor_score, "HACOR", 0, 15, [5, 10], ["≤5", ">10"], inverse=True), unsafe_allow_html=True)
-with col_g3:
-    st.markdown(render_gauge(pafi_ratio, "PAFI", 0, 400, [150, 300], ["<150", ">300"]), unsafe_allow_html=True)
+st.write("")
+st.markdown("### 📊 Índices de Seguridad")
+
+# Renderizar Gráfico ROX
+html_rox = render_gauge(
+    value=rox_index,
+    title="Índice ROX",
+    min_val=0,
+    max_val=12,
+    thresholds=[2.85, 4.88],
+    labels=["Alto Riesgo (<2.85)", "Vigilancia (2.85-4.88)", "Bajo Riesgo (>4.88)"],
+    inverse=False
+)
+st.markdown(html_rox, unsafe_allow_html=True)
+
+# Renderizar Gráfico HACOR
+# Puntos de corte: <= 5 éxito, > 5 fallo.
+# Usamos thresholds [5, 10] para mostrar gradiente
+html_hacor = render_gauge(
+    value=hacor_score,
+    title="Índice HACOR (1h VNI)",
+    min_val=0,
+    max_val=25,
+    thresholds=[5, 10], 
+    labels=["Éxito (≤5)", "Riesgo (>5)", "Fallo (>10)"],
+    inverse=True # Inverso: Bajo es bueno, Alto es malo
+)
+st.markdown(html_hacor, unsafe_allow_html=True)
+
+# Renderizar Gráfico PaFi
+html_pafi = render_gauge(
+    value=pafi_ratio,
+    title="PaFi Ratio",
+    min_val=0,
+    max_val=500,
+    thresholds=[150, 300],
+    labels=["Severo (<150)", "Leve/Mod (150-300)", "Normal (>300)"],
+    inverse=False
+)
+st.markdown(html_pafi, unsafe_allow_html=True)
 
 # ==========================================
 # 8. IA BOTÓN
 # ==========================================
 st.write("")
-if st.button("✨ Análisis IA", type="primary", use_container_width=True):
+if st.button("🧠 OBTENER RECOMENDACIÓN IA PERSONALIZADA"):
     if not api_key:
-        st.error("Falta API Key")
+        st.error("⚠️ API Key no detectada.")
+    elif not patologia:
+        st.warning("⚠️ Seleccione una patología primero.")
     else:
-        with st.spinner("Consultando..."):
+        with st.spinner("Analizando..."):
             try:
                 genai.configure(api_key=api_key)
-                prompt = f"""Actúa como Neumólogo Experto. 
-                Datos: Patología: {patologia or 'No esp.'}, FR:{rr}, FC:{hr}, SpO2:{spo2}%, FiO2:{fio2}%, GCS:{glasgow}, pH:{ph}, pO2:{po2}.
-                Indices: ROX:{rox_index:.2f}, PAFI:{pafi_ratio:.0f}, HACOR:{hacor_score}.
-                
-                Dame 3 puntos clave de actuación inmediata en formato lista bullet points muy breve y directa. 
-                Si HACOR > 5 alerta de fallo VNI."""
-                
+                prompt = f"""ERES EXPERTO CLÍNICO. Contexto: {patologia}, FR {rr}, FC {hr}, SpO2 {spo2}, FiO2 {fio2}, GCS {glasgow}, pH {ph}, pO2 {po2}.
+                Índices Calculados: ROX {rox_index:.2f}, PaFi {pafi_ratio:.0f}, HACOR {hacor_score}.
+                Dame una recomendación clínica breve.
+                IMPORTANTE: Si HACOR > 5 tras 1h de VNI, alerta sobre alto riesgo de fracaso e intubación.
+                Prioriza seguridad del paciente, ajustes del ventilador. Formato Markdown."""
                 model = genai.GenerativeModel('gemini-3-flash-preview')
                 response = model.generate_content(prompt)
-                st.info(response.text)
+                st.info("Recomendación IA:")
+                st.markdown(response.text)
             except Exception as e:
-                st.error("Error conexión IA")
+                st.error(f"Error: {str(e)}")
