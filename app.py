@@ -279,7 +279,7 @@ def render_gauge(value, title, min_val, max_val, thresholds, labels, inverse=Fal
         </div>
         <div style="display:flex; justify-content:space-between; font-size:0.6rem; color:#94a3b8; margin-top:2px;">
             <span>{labels[0]}</span>
-            <span>{labels[2]}</span>
+            <span>{labels[-1]}</span>
         </div>
     </div>
     """
