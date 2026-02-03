@@ -106,20 +106,19 @@ st.markdown("""
         padding: 0 !important;
         line-height: 1.2 !important;
         display: flex;
-        align-items: center;
+        align-items: center; /* Alineación vertical centrada */
         height: 100%;
-        padding-top: 10px !important; /* Alineación visual con el logo */
+        padding-top: 10px !important;
     }
     
-    .logo-subtitle {
+    .header-subtitle-inline {
         font-family: "Source Sans Pro", sans-serif;
         font-style: italic;
-        font-size: 0.7rem !important;
+        font-size: 1rem !important; 
         color: #64748b;
-        text-align: center;
-        margin-top: -2px;
-        line-height: 1;
-        width: 100%;
+        font-weight: 400;
+        margin-left: 10px;
+        padding-top: 8px; /* Pequeño ajuste visual para alinear con la base del texto grande */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -204,16 +203,14 @@ c_logo, c_text = st.columns([1.2, 8.8])
 
 with c_logo:
     try:
-        # Logo responsive dentro de una columna estrecha
+        # Logo responsive
         st.image("IMG/SRNI.png", use_container_width=True)
-        # Subtítulo debajo del logo
-        st.markdown('<div class="logo-subtitle">By iDoctor</div>', unsafe_allow_html=True)
     except Exception:
         st.error("Logo?")
 
 with c_text:
-    # Título alineado
-    st.markdown('<h1 class="header-title">Asistente SRNI</h1>', unsafe_allow_html=True)
+    # Título alineado con el subtítulo "By iDoctor" en la misma línea
+    st.markdown('<h1 class="header-title">Asistente SRNI <span class="header-subtitle-inline">By iDoctor</span></h1>', unsafe_allow_html=True)
 
 # ==========================================
 # 5. PANEL CENTRAL
